@@ -16,6 +16,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   image_picker: ^1.0.4
+  livekit_client: ^2.4.0  # <--- Added production client package here
 
   # State Management
   flutter_riverpod: ^2.5.1
@@ -42,7 +43,6 @@ dev_dependencies:
   # Code Generation for Hive TypeAdapters
   hive_generator: ^2.0.1
   build_runner: ^2.4.9
-  image_picker: ^1.0.4
 
   # Lint rules for clean code practices
   flutter_lints: ^4.0.0
