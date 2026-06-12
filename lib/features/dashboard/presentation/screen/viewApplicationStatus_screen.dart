@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/dashboard/presentation/controller/job_controller.dart';
+import 'package:interviewer/features/interview/presentation/controller/interview_controller.dart';
 
 class ViewapplicationstatusScreen extends ConsumerStatefulWidget {
   final String applicationID;
@@ -30,7 +31,7 @@ class _ViewapplicationstatusScreenState
 
   // Pure Dart helper to format ISO strings without relying on package:intl
   String _formatDateTimeString(String? rawIso) {
-    if (rawIso == null) return 'Date/Time Unknown';
+    if (rawIso == null || rawIso.isEmpty) return 'Date/Time Unknown';
     try {
       final DateTime dt = DateTime.parse(rawIso).toLocal();
       final List<String> months = [
@@ -263,7 +264,6 @@ class _ViewapplicationstatusScreenState
             icon: const Icon(Icons.file_download_outlined, size: 22, color: Colors.blueAccent),
             onPressed: () {
               debugPrint('Downloading track or opening path file layout: ${resume['downloadPath']}');
-              // Hook your execution environment's download manager logic here
             },
           )
         ],
@@ -272,9 +272,38 @@ class _ViewapplicationstatusScreenState
   }
 
   Widget _buildInterviewItem(Map<String, dynamic> interview) {
+    print(interview.toString());
+    final String interviewId = interview['interviewId']?.toString() ?? '';
     final String formattedTime = _formatDateTimeString(interview['scheduledTime']?.toString());
-    final String formatType = interview['format']?.toString().toUpperCase() ?? 'VIDEO';
-    final String status = interview['status']?.toString() ?? 'scheduled';
+    final String formatType = interview['format']?.toString().toUpperCase() ?? 'VIDEO CALL';
+    final String status = (interview['status'] ?? 'scheduled').toString().toLowerCase();
+
+    final hasPendingReschedule = status == 'reschedule_requested';
+    final isInactive = ['completed', 'cancelled'].contains(status);
+    final interviewState = ref.watch(interviewControllerProvider);
+
+    // Color Token Maps matching your specifications
+    Color statusColor = const Color(0xFF8E8E93);
+    Color statusBg = const Color(0xFFF2F2F7);
+    String labelText = status.toUpperCase();
+
+    if (status == 'confirmed') {
+      statusColor = const Color(0xFF34C759);
+      statusBg = const Color(0xFFEAF9EB);
+      labelText = "CONFIRMED";
+    } else if (status == 'scheduled') {
+      statusColor = const Color(0xFF007AFF);
+      statusBg = const Color(0xFFE5F1FF);
+      labelText = "SCHEDULED";
+    } else if (status == 'reschedule_requested') {
+      statusColor = const Color(0xFFFF9500);
+      statusBg = const Color(0xFFFFF2E0);
+      labelText = "RESCHEDULE PENDING";
+    } else if (status == 'in_progress') {
+      statusColor = const Color(0xFFA55EEA);
+      statusBg = const Color(0xFFF5E6FF);
+      labelText = "LIVE SESSION";
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -292,23 +321,23 @@ class _ViewapplicationstatusScreenState
             children: [
               Row(
                 children: [
-                  Icon(Icons.video_call_outlined, size: 20, color: Colors.blue.shade700),
+                  Icon(Icons.video_call_outlined, size: 20, color: statusColor),
                   const SizedBox(width: 8),
                   Text(
-                    '$formatType INTERVIEW',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                    formatType,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: statusColor),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: statusBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  status.toUpperCase(),
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                  labelText,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
                 ),
               ),
             ],
@@ -323,29 +352,246 @@ class _ViewapplicationstatusScreenState
             'Duration: ${interview['durationMinutes'] ?? 30} mins',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
-          if (interview['joinLink'] != null) ...[
-            const SizedBox(height: 14),
-            SizedBox(
+
+          // Render Proposal Tracker Alert Info Banner
+          if (hasPendingReschedule && interview['rescheduleRequests'] != null && (interview['rescheduleRequests'] as List).isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
               width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.videocam, size: 16),
-                label: const Text('Join Interview Room'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.blue.shade700,
-                  side: BorderSide(color: Colors.blue.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () {
-                  final links = interview['joinLink'].toString().split(',');
-                  final targetLink = links.isNotEmpty ? links[0] : interview['joinLink'];
-                  debugPrint('Navigating directly out to target system: $targetLink');
-                },
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF9F0),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFE5BC), width: 0.5),
               ),
-            )
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Proposed New Window:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9500))),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDateTimeString(interview['rescheduleRequests'][0]['proposedTime'] ?? ''),
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  ),
+                  if (interview['rescheduleRequests'][0]['candidateNote']?.toString().isNotEmpty ?? false) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      "Note: \"${interview['rescheduleRequests'][0]['candidateNote']}\"",
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontStyle: FontStyle.italic),
+                    ),
+                  ]
+                ],
+              ),
+            ),
+          ],
+
+          // Action buttons
+          if (!isInactive) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                if (!hasPendingReschedule && status != 'confirmed') ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE5E5EA)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      onPressed: interviewState.isSubmitting ? null : () async {
+                        final success = await ref.read(interviewControllerProvider.notifier).confirmInterview(interviewId);
+                        if (context.mounted && success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Attendance presence verified.')),
+                          );
+                          // FIXED: Refetch application data logs to reload layout statuses
+                          await ref.read(jobApplicationProvider.notifier).fetchApplicationLogs(widget.applicationID);
+                        }
+                      },
+                      child: const Text("Confirm", style: TextStyle(color: Color(0xFF1C1C1E), fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (!hasPendingReschedule) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE5E5EA)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      onPressed: interviewState.isSubmitting ? null : () => _showRescheduleSheet(context, interviewId),
+                      child: const Text("Reschedule", style: TextStyle(color: Color(0xFF636366), fontSize: 13, fontWeight: FontWeight.w500)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (interview['joinLink'] != null)
+                  Expanded(
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      onPressed: () {
+                        final links = interview['joinLink'].toString().split(',');
+                        final targetLink = links.isNotEmpty ? links[0] : interview['joinLink'];
+                        debugPrint('Navigating directly out to target system: $targetLink');
+                      },
+                      child: const Text("Join", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+              ],
+            ),
           ]
         ],
       ),
+    );
+  }
+
+  /// Interactive Bottom Sheet for Proposing a Reschedule
+  void _showRescheduleSheet(BuildContext context, String interviewId) {
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    final noteController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Request Modification", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black)),
+                  const SizedBox(height: 4),
+                  const Text("Propose a fresh scheduling availability matrix coordinate window.", style: TextStyle(fontSize: 12, color: Color(0xFF8E8E93))),
+                  const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFFE5E5EA)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.calendar_month, size: 16, color: Colors.black87),
+                          label: Text(
+                            selectedDate == null ? "Select Date" : "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
+                            style: const TextStyle(fontSize: 13, color: Colors.black87),
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now().add(const Duration(days: 1)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 30)),
+                            );
+                            if (picked != null) setModalState(() => selectedDate = picked);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFFE5E5EA)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.black87),
+                          label: Text(
+                            selectedTime == null ? "Select Time" : selectedTime!.format(context),
+                            style: const TextStyle(fontSize: 13, color: Colors.black87),
+                          ),
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+                            if (picked != null) setModalState(() => selectedTime = picked);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: noteController,
+                    maxLines: 3,
+                    style: const TextStyle(fontSize: 13, color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: "Provide context regarding availability shifts...",
+                      hintStyle: const TextStyle(color: Color(0xFFBcBcBd), fontSize: 13),
+                      fillColor: const Color(0xFFF2F2F7),
+                      filled: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFE5E5EA),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: (selectedDate == null || selectedTime == null) ? null : () async {
+                        final combinedDateTime = DateTime(
+                          selectedDate!.year,
+                          selectedDate!.month,
+                          selectedDate!.day,
+                          selectedTime!.hour,
+                          selectedTime!.minute,
+                        );
+
+                        Navigator.pop(context); // Dismiss drawer
+
+                        final dispatch = await ref.read(interviewControllerProvider.notifier).requestReschedule(
+                          interviewId: interviewId,
+                          proposedTime: combinedDateTime,
+                          note: noteController.text.trim(),
+                        );
+
+                        if (context.mounted && dispatch) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reschedule proposal request pipeline dispatched.')),
+                          );
+                          // FIXED: Force application status state container update
+                          await ref.read(jobApplicationProvider.notifier).fetchApplicationLogs(widget.applicationID);
+                        }
+                      },
+                      child: const Text("Submit Proposal Request", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ),
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

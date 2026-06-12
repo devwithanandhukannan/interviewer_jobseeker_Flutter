@@ -55,7 +55,7 @@ final dioProvider = FutureProvider<Dio>((ref) async {
           // Call your Express backend refresh endpoint
           // Cookies (refreshToken) are attached automatically by the cookie manager
           final response = await refreshDio.get('auth/refresh');
-
+          print(response);
           if (response.statusCode == 200) {
             print('✅ Session extended successfully. Retrying original request...');
 

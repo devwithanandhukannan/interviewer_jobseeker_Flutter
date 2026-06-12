@@ -2,33 +2,63 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/interview/presentation/screen/viewApplication_screen.dart';
+import 'package:interviewer/features/profile/presentation/screen/profile_screen.dart';
+import 'package:interviewer/features/interview/presentation/screen/interview_screen.dart';
 import '../../presentation/providers/navigation_provider.dart';
 import './job_screen.dart';
-import 'package:interviewer/features/profile/presentation/screen/profile_screen.dart';
 import './dashboard_screen.dart';
-import 'package:interviewer/features/interview/presentation/screen/interview_screen.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  // Order mapped directly to the BottomNavigationBar items below
   static const List<Widget> _pages = [
-    DashboardScreen(),
-    ViewapplicationScreen(),
-    InterviewScreen(),
-    ProfileScreen()
+    DashboardScreen(),           // 0: Home
+    ViewapplicationScreen(),     // 1: Applied
+    JobListScreen(),             // 2: Browse
+    InterviewScreen(),           // 3: Interview
+    ProfileScreen(),             // 4: Profile
   ];
+
+  // Securely converts your exact enum state to the UI index integer
+  int _getSafeIndex(DashboardTab tab) {
+    // Dynamic matching by string name downcase to bypass any case-mismatch compiler blocks
+    final String tabName = tab.name.toLowerCase();
+
+    if (tabName == 'home') return 0;
+    if (tabName == 'applied') return 1;
+    if (tabName == 'browse') return 2;
+    if (tabName.contains('interview')) return 3;
+    if (tabName == 'profile') return 4;
+    return 0; // Default safety net
+  }
+
+  // Updates the enum cleanly based on tap index
+  DashboardTab _getTabFromIndex(int index) {
+    final values = DashboardTab.values;
+
+    switch (index) {
+      case 0:
+        return values.firstWhere((e) => e.name.toLowerCase() == 'home', orElse: () => values[0]);
+      case 1:
+        return values.firstWhere((e) => e.name.toLowerCase() == 'applied', orElse: () => values[0]);
+      case 2:
+        return values.firstWhere((e) => e.name.toLowerCase() == 'browse', orElse: () => values[0]);
+      case 3:
+        return values.firstWhere((e) => e.name.toLowerCase().contains('interview'), orElse: () => values[0]);
+      case 4:
+        return values.firstWhere((e) => e.name.toLowerCase() == 'profile', orElse: () => values[0]);
+      default:
+        return values[0];
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTab = ref.watch(dashboardIndexProvider);
 
-    // Safely read the current index without crashing if the enum doesn't map to 3
-    int safeIndex = 0;
-    try {
-      safeIndex = currentTab.index;
-    } catch (_) {
-      // Fallback fallback to profile if index bound gets confused
-      safeIndex = 3;
-    }
+    // Fallback safe index calculation
+    final int currentIndex = _getSafeIndex(currentTab);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
@@ -37,7 +67,7 @@ class HomeScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.white,
         body: IndexedStack(
-          index: safeIndex < _pages.length ? safeIndex : 0,
+          index: currentIndex < _pages.length ? currentIndex : 0,
           children: _pages,
         ),
         bottomNavigationBar: Container(
@@ -50,23 +80,9 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           child: BottomNavigationBar(
-            currentIndex: safeIndex < 4 ? safeIndex : 0,
+            currentIndex: currentIndex,
             onTap: (index) {
-              // SAFE CONVERSION: Maps bottom layout indices explicitly to your enum values
-              if (index == 0) {
-                ref.read(dashboardIndexProvider.notifier).state = DashboardTab.values[0]; // Home
-              } else if (index == 1) {
-                ref.read(dashboardIndexProvider.notifier).state = DashboardTab.values[1]; // Browse
-              } else if (index == 2) {
-                ref.read(dashboardIndexProvider.notifier).state = DashboardTab.values[2]; // Applied
-              } else if (index == 3) {
-                // If your enum doesn't have item 3 yet, fall back to index 2 to prevent crash
-                if (DashboardTab.values.length > 3) {
-                  ref.read(dashboardIndexProvider.notifier).state = DashboardTab.values[3];
-                } else {
-                  ref.read(dashboardIndexProvider.notifier).state = DashboardTab.values[2];
-                }
-              }
+              ref.read(dashboardIndexProvider.notifier).state = _getTabFromIndex(index);
             },
             type: BottomNavigationBarType.fixed,
             backgroundColor: Colors.white,
@@ -102,6 +118,17 @@ class HomeScreen extends ConsumerWidget {
               BottomNavigationBarItem(
                 icon: Padding(
                   padding: EdgeInsets.only(bottom: 4),
+                  child: Icon(Icons.assignment_turned_in_outlined, size: 22),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Icon(Icons.assignment_turned_in, size: 22),
+                ),
+                label: 'Applied',
+              ),
+              BottomNavigationBarItem(
+                icon: Padding(
+                  padding: EdgeInsets.only(bottom: 4),
                   child: Icon(Icons.search_rounded, size: 22),
                 ),
                 activeIcon: Padding(
@@ -119,7 +146,7 @@ class HomeScreen extends ConsumerWidget {
                   padding: EdgeInsets.only(bottom: 4),
                   child: Icon(Icons.archive, size: 22),
                 ),
-                label: 'Applied',
+                label: 'Interview',
               ),
               BottomNavigationBarItem(
                 icon: Padding(
