@@ -4,15 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/core/dio_controller.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:dio/dio.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-// 1. Keeping your precise State Definition Framework
+// Precise State Definition Framework
 class MeetRoomState {
   final bool isLoading;
   final String? error;
   final Room? room;
   final bool isAudioEnabled;
   final bool isVideoEnabled;
-  final bool isScreenSharing;
   final List<Map<String, dynamic>> chatMessages;
 
   MeetRoomState({
@@ -21,7 +21,6 @@ class MeetRoomState {
     this.room,
     this.isAudioEnabled = true,
     this.isVideoEnabled = true,
-    this.isScreenSharing = false,
     this.chatMessages = const [],
   });
 
@@ -31,7 +30,6 @@ class MeetRoomState {
     Room? room,
     bool? isAudioEnabled,
     bool? isVideoEnabled,
-    bool? isScreenSharing,
     List<Map<String, dynamic>>? chatMessages,
   }) {
     return MeetRoomState(
@@ -40,13 +38,12 @@ class MeetRoomState {
       room: room ?? this.room,
       isAudioEnabled: isAudioEnabled ?? this.isAudioEnabled,
       isVideoEnabled: isVideoEnabled ?? this.isVideoEnabled,
-      isScreenSharing: isScreenSharing ?? this.isScreenSharing,
       chatMessages: chatMessages ?? this.chatMessages,
     );
   }
 }
 
-// 2. Updated StateNotifier Provider passing the Ref context object
+// StateNotifier Provider passing the Ref context object
 final meetControllerProvider = StateNotifierProvider.family<MeetController, MeetRoomState, String>((ref, interviewId) {
   return MeetController(interviewId, ref);
 });
@@ -55,7 +52,7 @@ class MeetController extends StateNotifier<MeetRoomState> {
   final String interviewId;
   final Ref _ref;
 
-  // Your base LiveKit WebRTC SFU server URL endpoint configuration
+  // Base LiveKit WebRTC SFU server URL endpoint configuration
   final String livekitUrl = "http://10.0.2.2:7880";
 
   MeetController(this.interviewId, this._ref) : super(MeetRoomState());
@@ -69,11 +66,21 @@ class MeetController extends StateNotifier<MeetRoomState> {
     try {
       state = state.copyWith(isLoading: true, error: null);
 
+      // 1. Request Runtime Permissions directly prior to starting WebRTC tracks
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      if (statuses[Permission.camera] != PermissionStatus.granted ||
+          statuses[Permission.microphone] != PermissionStatus.granted) {
+        throw Exception('Hardware Permissions (Camera/Microphone) are required to join the call.');
+      }
+
       // Fetch our configured instance of Dio containing cookies & interceptors
       final dio = await _getDio();
 
-      // 1. Fetch Room Authentication Token payload signatures from Express
-      // Hit path relative to base ('http://10.0.2.2:8000/api/')
+      // 2. Fetch Room Authentication Token payload signatures from Express
       final response = await dio.post('interviews/$interviewId/token/jobseeker');
 
       if (response.data?['success'] != true || response.data?['token'] == null) {
@@ -82,7 +89,7 @@ class MeetController extends StateNotifier<MeetRoomState> {
 
       final String token = response.data['token'];
 
-      // 2. Initialize LiveKit Room Engine
+      // 3. Initialize LiveKit Room Engine
       final room = Room();
       final listener = room.createListener();
       _setupRoomListeners(listener);
@@ -90,7 +97,7 @@ class MeetController extends StateNotifier<MeetRoomState> {
       // Connect to the room signaling transport channels
       await room.connect(livekitUrl, token);
 
-      // 3. Publish Local Video & Audio Tracks automatically on launch
+      // 4. Publish Local Video & Audio Tracks automatically on launch
       await room.localParticipant?.setCameraEnabled(true);
       await room.localParticipant?.setMicrophoneEnabled(true);
 
@@ -108,23 +115,32 @@ class MeetController extends StateNotifier<MeetRoomState> {
   void _setupRoomListeners(EventsListener<RoomEvent> listener) {
     // Listen for incoming Data Messages (Chat Text Messages)
     listener.on<DataReceivedEvent>((event) {
-      try {
-        final decodedString = utf8.decode(event.data);
-        final Map<String, dynamic> messageMap = jsonDecode(decodedString);
+      // CRITICAL FIX: Only parse messages sent explicitly over the 'chat' topic channel
+      if (event.topic == 'chat') {
+        try {
+          final decodedString = utf8.decode(event.data);
+          final Map<String, dynamic> messageMap = jsonDecode(decodedString);
 
-        state = state.copyWith(
-          chatMessages: [...state.chatMessages, messageMap],
-        );
-      } catch (e) {
-        debugPrint('Failed parsing data channel payload buffer structure: $e');
+          state = state.copyWith(
+            chatMessages: [...state.chatMessages, messageMap],
+          );
+        } catch (e) {
+          debugPrint('Failed parsing data channel payload buffer structure: $e');
+        }
       }
     });
 
     // Structural room events setup to trigger UI repaints
     listener.on<ParticipantConnectedEvent>((_) => _forceStateRefresh());
     listener.on<ParticipantDisconnectedEvent>((_) => _forceStateRefresh());
+
+    // Track publication updates (Crucial for remote hardware toggles & layout changes)
     listener.on<TrackSubscribedEvent>((_) => _forceStateRefresh());
     listener.on<TrackUnsubscribedEvent>((_) => _forceStateRefresh());
+    listener.on<TrackPublishedEvent>((_) => _forceStateRefresh());
+    listener.on<TrackUnpublishedEvent>((_) => _forceStateRefresh());
+    listener.on<TrackMutedEvent>((_) => _forceStateRefresh());
+    listener.on<TrackUnmutedEvent>((_) => _forceStateRefresh());
   }
 
   // Media Track Control Triggers
@@ -142,18 +158,6 @@ class MeetController extends StateNotifier<MeetRoomState> {
     state = state.copyWith(isVideoEnabled: newValue);
   }
 
-  Future<void> toggleScreenShare() async {
-    if (state.room == null) return;
-    final newValue = !state.isScreenSharing;
-    try {
-      await state.room!.localParticipant?.setScreenShareEnabled(newValue);
-      state = state.copyWith(isScreenSharing: newValue);
-    } catch (e) {
-      debugPrint("Screenshare platform pipeline activation error: $e");
-    }
-  }
-
-  // Real-time Chat Data Channel Emitter
   // Real-time Chat Data Channel Emitter
   Future<void> sendChatMessage(String messageText) async {
     if (state.room == null || messageText.trim().isEmpty) return;
@@ -167,13 +171,14 @@ class MeetController extends StateNotifier<MeetRoomState> {
     try {
       final List<int> dataBuffer = utf8.encode(jsonEncode(messagePayload));
 
-      // FIX: Use the simple 'reliable' named boolean parameter directly
+      // CRITICAL FIX: Explicitly pass the topic label to map with the Next.js frontend filter
       await state.room!.localParticipant?.publishData(
         dataBuffer,
         reliable: true,
+        topic: 'chat',
       );
 
-      // Append your own message locally to the list array layout
+      // Append your own message locally to the state array layout
       state = state.copyWith(
         chatMessages: [...state.chatMessages, messagePayload],
       );
@@ -187,7 +192,8 @@ class MeetController extends StateNotifier<MeetRoomState> {
   }
 
   Future<void> disconnectRoom() async {
-    await state.room?.disconnect();
-    state.room?.dispose();
+    final room = state.room;
+    await room?.disconnect();
+    room?.dispose();
   }
 }
