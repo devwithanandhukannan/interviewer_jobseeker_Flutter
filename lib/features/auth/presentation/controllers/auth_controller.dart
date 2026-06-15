@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/core/dio_controller.dart';
+import 'package:interviewer/core/notification_service.dart';
 
 enum AuthStatus { checking, authenticated, fillInitalData, unauthenticated }
 
@@ -53,6 +54,9 @@ class AuthController extends StateNotifier<AuthState> {
 
       if (response.statusCode == 200) {
         state = state.copyWith(status: AuthStatus.authenticated);
+
+        // Synchronize notification token on valid persistent session auto-login
+        _ref.read(notificationServiceProvider).syncTokenWithBackend();
       } else {
         state = state.copyWith(status: AuthStatus.unauthenticated);
       }
@@ -113,6 +117,9 @@ class AuthController extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           message: 'Login complete',
         );
+
+        // Synchronize notification token on successful OTP verification (If already profile-complete)
+        _ref.read(notificationServiceProvider).syncTokenWithBackend();
         return true;
       }
       state = state.copyWith(isLoading: false, message: 'Invalid OTP code.');
@@ -140,7 +147,10 @@ class AuthController extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           message: 'Profile updated successfully',
         );
-        return null; // Return null means no errors occurred
+
+        // Synchronize notification token immediately following registration update
+        _ref.read(notificationServiceProvider).syncTokenWithBackend();
+        return null;
       }
 
       state = state.copyWith(isLoading: false, message: 'Failed to update profile.');
@@ -148,7 +158,7 @@ class AuthController extends StateNotifier<AuthState> {
     } on DioException catch (e) {
       print('Dio Exception caught: ${e.response?.data}');
 
-      // Extract backend validation messages like "email already existed"
+      // Extract precise validation message ("email already existed") sent back from backend API
       final backendMessage = e.response?.data?['message'] ?? e.response?.data?['error'];
       final errorMessage = backendMessage?.toString() ?? 'Error updating profile details.';
 
