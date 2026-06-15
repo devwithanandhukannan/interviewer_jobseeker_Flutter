@@ -9,13 +9,12 @@ final _selectedResumeIdProvider = StateProvider.autoDispose<String?>((ref) => nu
 final _localResumePathProvider = StateProvider.autoDispose<String?>((ref) => null);
 final _localResumeNameProvider = StateProvider.autoDispose<String?>((ref) => null);
 final _isSubmittingProvider = StateProvider.autoDispose<bool>((ref) => false);
-final _applicationTypeProvider = StateProvider.autoDispose<String>((ref) => 'existing'); // 'existing' or 'upload'
+final _applicationTypeProvider = StateProvider.autoDispose<String>((ref) => 'existing');
 
 class ApplyjobScreen extends ConsumerWidget {
   final String jobId;
   const ApplyjobScreen({super.key, required this.jobId});
 
-  // Premium Minimalist Color Palette matching your design style
   static const _bg = Color(0xFFFAFAFA);
   static const _surface = Colors.white;
   static const _surfaceAlt = Color(0xFFF5F5F7);
@@ -52,7 +51,6 @@ class ApplyjobScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Segmented Tab Selector (Existing vs New Upload)
           Container(
             color: _surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -68,9 +66,7 @@ class ApplyjobScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        ref.read(_applicationTypeProvider.notifier).state = 'existing';
-                      },
+                      onTap: () => ref.read(_applicationTypeProvider.notifier).state = 'existing',
                       child: Container(
                         decoration: BoxDecoration(
                           color: applicationType == 'existing' ? _surface : Colors.transparent,
@@ -93,9 +89,7 @@ class ApplyjobScreen extends ConsumerWidget {
                   ),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        ref.read(_applicationTypeProvider.notifier).state = 'upload';
-                      },
+                      onTap: () => ref.read(_applicationTypeProvider.notifier).state = 'upload',
                       child: Container(
                         decoration: BoxDecoration(
                           color: applicationType == 'upload' ? _surface : Colors.transparent,
@@ -121,7 +115,6 @@ class ApplyjobScreen extends ConsumerWidget {
             ),
           ),
 
-          // Main Interactive Body View
           Expanded(
             child: applicationType == 'existing'
                 ? resumeState.when(
@@ -129,9 +122,7 @@ class ApplyjobScreen extends ConsumerWidget {
               error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: _textSecondary))),
               data: (data) {
                 final List<dynamic> resumesList = data['data'] ?? [];
-                if (resumesList.isEmpty) {
-                  return _buildEmptyResumesState(ref);
-                }
+                if (resumesList.isEmpty) return _buildEmptyResumesState(ref);
 
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
@@ -145,9 +136,7 @@ class ApplyjobScreen extends ConsumerWidget {
                     final bool isSelected = selectedResumeId == resumeId;
 
                     return GestureDetector(
-                      onTap: () {
-                        ref.read(_selectedResumeIdProvider.notifier).state = resumeId;
-                      },
+                      onTap: () => ref.read(_selectedResumeIdProvider.notifier).state = resumeId,
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -160,27 +149,18 @@ class ApplyjobScreen extends ConsumerWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.description_outlined,
-                              color: isSelected ? _accent : _textSecondary,
-                              size: 22,
-                            ),
+                            Icon(Icons.description_outlined, color: isSelected ? _accent : _textSecondary, size: 22),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    resumeName,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  Text(resumeName,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
                                   const SizedBox(height: 3),
-                                  Text(
-                                    'ATS Score: $atsScore%',
-                                    style: const TextStyle(fontSize: 12, color: _textMuted),
-                                  ),
+                                  Text('ATS Score: $atsScore%', style: const TextStyle(fontSize: 12, color: _textMuted)),
                                 ],
                               ),
                             ),
@@ -188,9 +168,7 @@ class ApplyjobScreen extends ConsumerWidget {
                               value: resumeId,
                               groupValue: selectedResumeId,
                               activeColor: _accent,
-                              onChanged: (value) {
-                                ref.read(_selectedResumeIdProvider.notifier).state = value;
-                              },
+                              onChanged: (value) => ref.read(_selectedResumeIdProvider.notifier).state = value,
                             ),
                           ],
                         ),
@@ -216,24 +194,16 @@ class ApplyjobScreen extends ConsumerWidget {
                     Container(
                       height: 60,
                       width: 60,
-                      decoration: const BoxDecoration(
-                        color: _surfaceAlt,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: const BoxDecoration(color: _surfaceAlt, shape: BoxShape.circle),
                       child: const Icon(Icons.cloud_upload_outlined, size: 28, color: _textPrimary),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Select your document attachment',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary),
-                    ),
+                    const Text('Select your document attachment',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Supports PDF, DOCX formats (Max 5MB)',
-                      style: TextStyle(fontSize: 12, color: _textMuted),
-                    ),
+                    const Text('Supports PDF, DOCX formats (Max 5MB)',
+                        style: TextStyle(fontSize: 12, color: _textMuted)),
                     const SizedBox(height: 24),
-
                     if (localResumePath != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -247,12 +217,10 @@ class ApplyjobScreen extends ConsumerWidget {
                             const Icon(Icons.picture_as_pdf_outlined, size: 18, color: Colors.redAccent),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                localResumeName ?? 'Selected Document',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPrimary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Text(localResumeName ?? 'Selected Document',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
                             ),
                             GestureDetector(
                               onTap: () {
@@ -266,16 +234,15 @@ class ApplyjobScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
-
-                    ElevatedButton.styleFrom(
-                      backgroundColor: _accentDim,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: const BorderSide(color: _border, width: 0.5)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accentDim,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: _border, width: 0.5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ).buildButton(
                       onPressed: () => _pickLocalFile(ref),
                       child: Text(
                         localResumePath == null ? 'Browse File' : 'Change File',
@@ -288,7 +255,6 @@ class ApplyjobScreen extends ConsumerWidget {
             ),
           ),
 
-          // Bottom Action Button Container
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -341,9 +307,11 @@ class ApplyjobScreen extends ConsumerWidget {
         children: [
           const Icon(Icons.folder_open_rounded, size: 40, color: _textMuted),
           const SizedBox(height: 12),
-          const Text('No Saved Resumes Found', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
+          const Text('No Saved Resumes Found',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
           const SizedBox(height: 4),
-          const Text('Switch over to upload a new resume profile file directly.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: _textSecondary)),
+          const Text('Switch over to upload a new resume profile file directly.',
+              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: _textSecondary)),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () => ref.read(_applicationTypeProvider.notifier).state = 'upload',
@@ -356,17 +324,8 @@ class ApplyjobScreen extends ConsumerWidget {
 
   Future<void> _pickLocalFile(WidgetRef ref) async {
     try {
-      // Define accepted format restrictions matching your UX hints
-      const XTypeGroup typeGroup = XTypeGroup(
-        label: 'resumes',
-        extensions: <String>['pdf', 'docx'],
-      );
-
-      // Open Native File Selector Interface
-      final XFile? file = await openFile(
-        acceptedTypeGroups: <XTypeGroup>[typeGroup],
-      );
-
+      const XTypeGroup typeGroup = XTypeGroup(label: 'resumes', extensions: <String>['pdf', 'docx']);
+      final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
       if (file != null) {
         ref.read(_localResumePathProvider.notifier).state = file.path;
         ref.read(_localResumeNameProvider.notifier).state = file.name;
@@ -376,7 +335,13 @@ class ApplyjobScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _handleSubmission(BuildContext context, WidgetRef ref, String type, String? resumeId, String? localPath) async {
+  Future<void> _handleSubmission(
+      BuildContext context,
+      WidgetRef ref,
+      String type,
+      String? resumeId,
+      String? localPath,
+      ) async {
     ref.read(_isSubmittingProvider.notifier).state = true;
 
     try {
@@ -390,6 +355,11 @@ class ApplyjobScreen extends ConsumerWidget {
         );
       }
 
+      // Invalidate the job list so the card reflects "Applied" immediately
+      ref.invalidate(jobControllerProvider);
+      // Also invalidate the specific job detail cache
+      ref.invalidate(jobDetailDataProvider(jobId));
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -398,7 +368,9 @@ class ApplyjobScreen extends ConsumerWidget {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context);
+        // Pop apply screen, then pop the job detail bottom sheet
+        // Returning true signals JobDetailPopup to also close itself
+        Navigator.pop(context, true);
       }
     } catch (error) {
       if (context.mounted) {
@@ -411,14 +383,9 @@ class ApplyjobScreen extends ConsumerWidget {
         );
       }
     } finally {
-      ref.read(_isSubmittingProvider.notifier).state = false;
+      if (context.mounted) {
+        ref.read(_isSubmittingProvider.notifier).state = false;
+      }
     }
-  }
-}
-
-// Inline extension setup to keep UI configurations highly semantic
-extension _ButtonBuilder on ButtonStyle {
-  Widget buildButton({required VoidCallback onPressed, required Widget child}) {
-    return ElevatedButton(style: this, onPressed: onPressed, child: child);
   }
 }

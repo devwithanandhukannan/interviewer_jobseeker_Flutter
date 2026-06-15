@@ -1,10 +1,63 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/settings/presentations/controller/resume_controller.dart';
 import 'package:intl/intl.dart';
+import 'package:file_selector/file_selector.dart'; // Changed to file_selector
 
 class ResumeListScreen extends ConsumerWidget {
   const ResumeListScreen({Key? key}) : super(key: key);
+
+  // Method to handle pick action using file_selector package
+  Future<void> _handleUpload(BuildContext context, WidgetRef ref) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      // 1. Define explicit extensions allowed by the system
+      const XTypeGroup typeGroup = XTypeGroup(
+        label: 'Resumes',
+        extensions: <String>['pdf', 'doc', 'docx'],
+      );
+
+      // 2. Open the file selection panel natively
+      final XFile? fileResult = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
+
+      if (fileResult == null) {
+        // User cancelled selection
+        return;
+      }
+
+      final File file = File(fileResult.path);
+      final String systemFileName = fileResult.name;
+
+      // 3. Open minimal dialog to capture metadata configurations
+      if (!context.mounted) return;
+      final Map<String, String>? metaDetails = await showDialog<Map<String, String>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _UploadMetaDataDialog(initialName: systemFileName.split('.').first),
+      );
+
+      if (metaDetails == null) return;
+
+      // 4. Dispatch the payload parameters directly to your controller
+      final bool success = await ref.read(resumeControllerProvider.notifier).uploadResumeFile(
+        file: file,
+        name: metaDetails['name'] ?? 'Untitled Resume',
+        jobDescription: metaDetails['jd'] ?? '',
+      );
+
+      if (success) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Resume uploaded successfully!')),
+        );
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error choosing file: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -15,7 +68,7 @@ class ResumeListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text(
           'My Resumes',
-          style: TextStyle(fontWeight: FontWeight.bold), // Fixed: Ensured color compatibility
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0.5,
@@ -26,6 +79,12 @@ class ResumeListScreen extends ConsumerWidget {
             onPressed: () => ref.read(resumeControllerProvider.notifier).fetchResumes(),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: resumeState.isLoading ? null : () => _handleUpload(context, ref),
+        backgroundColor: resumeState.isLoading ? Colors.grey : const Color(0xFF007AFF),
+        icon: const Icon(Icons.upload_file_rounded, color: Colors.white),
+        label: const Text('Upload Resume', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: Builder(
         builder: (context) {
@@ -67,39 +126,132 @@ class ResumeListScreen extends ConsumerWidget {
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () => ref.read(resumeControllerProvider.notifier).fetchResumes(),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: resumeState.resumes.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final resume = resumeState.resumes[index];
-                return ResumeCard(
-                  resume: resume,
-                  onTap: () {
-                    if (resume['id'] != null) {
-                      ref.read(resumeControllerProvider.notifier).fetchResumeById(resume['id'].toString());
-                    }
-                  },
-                  onDelete: () async {
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-                    final success = await ref
-                        .read(resumeControllerProvider.notifier)
-                        .deleteResumeRecord(resume['id'].toString());
+          return Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: () => ref.read(resumeControllerProvider.notifier).fetchResumes(),
+                child: ListView.separated(
+                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 80.0),
+                  itemCount: resumeState.resumes.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final resume = resumeState.resumes[index];
+                    return ResumeCard(
+                      resume: resume,
+                      onTap: () {
+                        if (resume['id'] != null) {
+                          ref.read(resumeControllerProvider.notifier).fetchResumeById(resume['id'].toString());
+                        }
+                      },
+                      onDelete: () async {
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        final success = await ref
+                            .read(resumeControllerProvider.notifier)
+                            .deleteResumeRecord(resume['id'].toString());
 
-                    if (success) {
-                      scaffoldMessenger.showSnackBar(
-                        const SnackBar(content: Text('Resume deleted successfully')),
-                      );
-                    }
+                        if (success) {
+                          scaffoldMessenger.showSnackBar(
+                            const SnackBar(content: Text('Resume deleted successfully')),
+                          );
+                        }
+                      },
+                    );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+              if (resumeState.isLoading)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(backgroundColor: Colors.transparent),
+                ),
+            ],
           );
         },
       ),
+    );
+  }
+}
+
+class _UploadMetaDataDialog extends StatefulWidget {
+  final String initialName;
+  const _UploadMetaDataDialog({required this.initialName});
+
+  @override
+  State<_UploadMetaDataDialog> createState() => _UploadMetaDataDialogState();
+}
+
+class _UploadMetaDataDialogState extends State<_UploadMetaDataDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  final TextEditingController _jdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _jdController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Resume Context Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Label Name *',
+                  hintText: 'e.g., Senior Software Developer',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) => (val == null || val.trim().isEmpty) ? 'Please define an alias' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _jdController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Target Job Description (Optional)',
+                  hintText: 'Paste requirements to check ATS and optimize...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState?.validate() ?? false) {
+              Navigator.pop(context, {
+                'name': _nameController.text,
+                'jd': _jdController.text,
+              });
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007AFF)),
+          child: const Text('Upload', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }
@@ -201,7 +353,7 @@ class ResumeCard extends StatelessWidget {
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.black45),
-                        iconSize: 22, // Fixed: Named parameter changed from 'size' to 'iconSize'
+                        iconSize: 22,
                         onPressed: () {
                           showDialog(
                             context: context,
@@ -232,7 +384,7 @@ class ResumeCard extends StatelessWidget {
                     child: Divider(height: 1, color: Color(0xFFE9ECEF)),
                   ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween, // Fixed: 'between' to 'spaceBetween'
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [

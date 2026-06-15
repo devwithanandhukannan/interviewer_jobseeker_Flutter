@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:interviewer/core/dio_controller.dart';
+import 'package:interviewer/features/auth/presentation/screen/login_screen.dart';
 import 'package:interviewer/features/settings/presentations/controller/spotJob_controller.dart';
 import 'package:interviewer/features/settings/presentations/screen/resume_screen.dart';
 
@@ -12,16 +14,48 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  // Editorial Minimalist Styling Spec Palette
   static const _bg = Color(0xFFFAFAFA);
   static const _surface = Colors.white;
   static const _border = BorderSide(color: Color(0xFFE5E5EA), width: 0.5);
   static const _textPrimary = Color(0xFF000000);
   static const _textSecondary = Color(0xFF6E6E73);
+  static const _destructiveRed = Color(0xFFFF3B30);
+  Future<void> _handleLogout() async {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CupertinoActivityIndicator(radius: 12),
+      ),
+    );
+
+    try {
+      await ref.read(logoutProvider.future);
+
+      if (mounted) {
+        Navigator.pop(context);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to clear session safely. Please try again.'),
+            backgroundColor: Colors.black87,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Watch the live state indices from your provider
     final spotJobState = ref.watch(spotJobProvider);
 
     return Scaffold(
@@ -43,7 +77,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         children: [
-          // Row Option 1: Live Spot Status Synchronization
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -65,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 spotJobState.is_toggled.when(
                   data: (bool isToggled) => CupertinoSwitch(
                     value: isToggled,
-                    activeColor: const Color(0xFF007AFF), // Apple Blue
+                    activeColor: const Color(0xFF007AFF),
                     trackColor: const Color(0xFFE5E5EA),
                     onChanged: (bool value) async {
                       await ref.read(spotJobProvider.notifier).spotJobStatusUpdate(value);
@@ -94,7 +127,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  // Fixed: Direct link to the fully functional Resume list dashboard layout
                   builder: (context) => const ResumeListScreen(),
                 ),
               );
@@ -118,14 +150,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       color: _textPrimary,
                     ),
                   ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 14,
-                        color: _textSecondary,
-                      ),
-                    ],
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: _textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          InkWell(
+            onTap: _handleLogout,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.fromBorderSide(_border),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: _destructiveRed,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Log Out',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: _destructiveRed,
+                    ),
                   ),
                 ],
               ),
