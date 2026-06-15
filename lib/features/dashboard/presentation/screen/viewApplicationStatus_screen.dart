@@ -1,8 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:interviewer/core/dio_controller.dart';
 import 'package:interviewer/features/dashboard/presentation/controller/job_controller.dart';
+import 'package:interviewer/features/dashboard/presentation/controller/resume_controller.dart';
 import 'package:interviewer/features/interview/presentation/controller/interview_controller.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 class ViewapplicationstatusScreen extends ConsumerStatefulWidget {
   final String applicationID;
@@ -29,7 +35,6 @@ class _ViewapplicationstatusScreenState
     });
   }
 
-  // Pure Dart helper to format ISO strings without relying on package:intl
   String _formatDateTimeString(String? rawIso) {
     if (rawIso == null || rawIso.isEmpty) return 'Date/Time Unknown';
     try {
@@ -49,7 +54,6 @@ class _ViewapplicationstatusScreenState
     }
   }
 
-  // Compact formatter for timeline logs
   String _formatShortTime(String? rawIso) {
     if (rawIso == null) return '';
     try {
@@ -237,6 +241,10 @@ class _ViewapplicationstatusScreenState
   }
 
   Widget _buildResumeCard(Map<String, dynamic> resume) {
+    final String resumeId = resume['id']?.toString() ?? '';
+    final String resumeName = resume['name'] ?? 'Applied CV';
+    final String fileName = resumeName.toLowerCase().endsWith('.pdf') ? resumeName : '$resumeName.pdf';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -252,27 +260,68 @@ class _ViewapplicationstatusScreenState
             child: const Icon(Icons.picture_as_pdf, size: 20, color: Colors.redAccent),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Applied CV',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
+              resumeName,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
           IconButton(
             icon: const Icon(Icons.file_download_outlined, size: 22, color: Colors.blueAccent),
-            onPressed: () {
-              debugPrint('Downloading track or opening path file layout: ${resume['downloadPath']}');
+            onPressed: () async {
+              if (resumeId.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Missing reference identifier for this document resource.')),
+                );
+                return;
+              }
+
+              // Show loading indicator
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                      SizedBox(width: 12),
+                      Text('Preparing document...'),
+                    ],
+                  ),
+                  duration: Duration(seconds: 30),
+                ),
+              );
+
+              try {
+                final dio = await ref.read(dioProvider.future);
+                final cacheDir = await getTemporaryDirectory();
+                final tempPath = '${cacheDir.path}/$fileName';
+
+                await dio.download(
+                  'jobseeker/resumes/$resumeId',
+                  tempPath,
+                );
+
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+                final XFile file = XFile(tempPath);
+                await Share.shareXFiles([file], text: 'Resume: $fileName');
+              } catch (err) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Download failed: $err')),
+                  );
+                }
+              }
             },
-          )
+          ),
         ],
       ),
     );
   }
 
   Widget _buildInterviewItem(Map<String, dynamic> interview) {
-    print(interview.toString());
     final String interviewId = interview['interviewId']?.toString() ?? '';
     final String formattedTime = _formatDateTimeString(interview['scheduledTime']?.toString());
     final String formatType = interview['format']?.toString().toUpperCase() ?? 'VIDEO CALL';
@@ -282,7 +331,6 @@ class _ViewapplicationstatusScreenState
     final isInactive = ['completed', 'cancelled'].contains(status);
     final interviewState = ref.watch(interviewControllerProvider);
 
-    // Color Token Maps matching your specifications
     Color statusColor = const Color(0xFF8E8E93);
     Color statusBg = const Color(0xFFF2F2F7);
     String labelText = status.toUpperCase();
@@ -303,6 +351,17 @@ class _ViewapplicationstatusScreenState
       statusColor = const Color(0xFFA55EEA);
       statusBg = const Color(0xFFF5E6FF);
       labelText = "LIVE SESSION";
+    }
+
+    // Safe Extraction Logic for Reschedule Window Payload
+    Map<String, dynamic>? latestRescheduleRequest;
+    if (hasPendingReschedule && interview['rescheduleRequests'] != null) {
+      final rawRequests = interview['rescheduleRequests'];
+      if (rawRequests is Map<String, dynamic>) {
+        latestRescheduleRequest = rawRequests;
+      } else if (rawRequests is List && rawRequests.isNotEmpty) {
+        latestRescheduleRequest = rawRequests[0] is Map<String, dynamic> ? rawRequests[0] : null;
+      }
     }
 
     return Container(
@@ -353,8 +412,7 @@ class _ViewapplicationstatusScreenState
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
 
-          // Render Proposal Tracker Alert Info Banner
-          if (hasPendingReschedule && interview['rescheduleRequests'] != null && (interview['rescheduleRequests'] as List).isNotEmpty) ...[
+          if (latestRescheduleRequest != null) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -367,16 +425,19 @@ class _ViewapplicationstatusScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Proposed New Window:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9500))),
+                  const Text(
+                    "Proposed New Window:",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF9500)),
+                  ),
                   const SizedBox(height: 2),
                   Text(
-                    _formatDateTimeString(interview['rescheduleRequests'][0]['proposedTime'] ?? ''),
+                    _formatDateTimeString(latestRescheduleRequest['proposedTime']?.toString() ?? ''),
                     style: const TextStyle(fontSize: 12, color: Colors.black87),
                   ),
-                  if (interview['rescheduleRequests'][0]['candidateNote']?.toString().isNotEmpty ?? false) ...[
+                  if (latestRescheduleRequest['candidateNote']?.toString().isNotEmpty ?? false) ...[
                     const SizedBox(height: 4),
                     Text(
-                      "Note: \"${interview['rescheduleRequests'][0]['candidateNote']}\"",
+                      "Note: \"${latestRescheduleRequest['candidateNote']}\"",
                       style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontStyle: FontStyle.italic),
                     ),
                   ]
@@ -385,7 +446,6 @@ class _ViewapplicationstatusScreenState
             ),
           ],
 
-          // Action buttons
           if (!isInactive) ...[
             const SizedBox(height: 14),
             Row(
@@ -404,7 +464,6 @@ class _ViewapplicationstatusScreenState
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Attendance presence verified.')),
                           );
-                          // FIXED: Refetch application data logs to reload layout statuses
                           await ref.read(jobApplicationProvider.notifier).fetchApplicationLogs(widget.applicationID);
                         }
                       },
@@ -452,7 +511,6 @@ class _ViewapplicationstatusScreenState
     );
   }
 
-  /// Interactive Bottom Sheet for Proposing a Reschedule
   void _showRescheduleSheet(BuildContext context, String interviewId) {
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
@@ -567,7 +625,7 @@ class _ViewapplicationstatusScreenState
                           selectedTime!.minute,
                         );
 
-                        Navigator.pop(context); // Dismiss drawer
+                        Navigator.pop(context);
 
                         final dispatch = await ref.read(interviewControllerProvider.notifier).requestReschedule(
                           interviewId: interviewId,
@@ -579,7 +637,6 @@ class _ViewapplicationstatusScreenState
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Reschedule proposal request pipeline dispatched.')),
                           );
-                          // FIXED: Force application status state container update
                           await ref.read(jobApplicationProvider.notifier).fetchApplicationLogs(widget.applicationID);
                         }
                       },

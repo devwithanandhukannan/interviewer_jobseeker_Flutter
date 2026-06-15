@@ -1,11 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:interviewer/features/auth/data/models/user_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-// Make sure this points to your updated file with the FutureProvider
 import 'package:interviewer/core/dio_controller.dart';
 
-enum AuthStatus { checking, authenticated, unauthenticated }
+enum AuthStatus { checking, authenticated, fillInitalData, unauthenticated }
 
 class AuthState {
   final String message;
@@ -42,9 +39,7 @@ class AuthController extends StateNotifier<AuthState> {
     checkCurrentUserSession();
   }
 
-  /// Helper method to safely retrieve the Dio instance from the FutureProvider
   Future<Dio> _getDio() async {
-    // dioProvider is now a FutureProvider, so we use future to wait for its initialization
     return await _ref.read(dioProvider.future);
   }
 
@@ -53,7 +48,7 @@ class AuthController extends StateNotifier<AuthState> {
       print('Checking authentication status...');
       final dio = await _getDio();
 
-      final response = await dio.get('auth/me'); // baseUrl already set in Dio
+      final response = await dio.get('auth/me');
       print('Status code received: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -94,12 +89,25 @@ class AuthController extends StateNotifier<AuthState> {
         'auth/verify-otp',
         data: {'mobileNumber': state.phoneNumber, 'otp': otp},
       );
-      if (response.statusCode == 200 && response.data != null) {
-        final user = UserModel.fromJson(response.data as Map<String, dynamic>);
-        final box = Hive.box('userBox');
-        await box.put('fullName', user.fullName);
-        await box.put('phoneNumber', user.phoneNumber);
-        await box.put('email', user.email);
+
+      final userData = response.data['user'];
+      if (response.statusCode == 200 && userData != null) {
+        final bool hasEmail = userData['hasEmail'] ?? false;
+        final bool hasFullName = userData['hasFullName'] ?? false;
+
+        print('Has Email: $hasEmail');
+        print('Has Full Name: $hasFullName');
+
+        // Redirect to initial data setup workflow if parameters are missing
+        if (!hasEmail || !hasFullName) {
+          state = state.copyWith(
+            isLoading: false,
+            status: AuthStatus.fillInitalData,
+            message: 'Please complete your registration profile.',
+          );
+          return true;
+        }
+
         state = state.copyWith(
           isLoading: false,
           status: AuthStatus.authenticated,
@@ -112,6 +120,44 @@ class AuthController extends StateNotifier<AuthState> {
     } catch (error) {
       state = state.copyWith(isLoading: false, message: 'Failed to verify OTP');
       return false;
+    }
+  }
+
+  Future<String?> saveInitialProfile({required String email, required String fullName}) async {
+    state = state.copyWith(isLoading: true, message: 'Saving profile...');
+    try {
+      final dio = await _getDio();
+      final response = await dio.put(
+        'jobseeker/profile',
+        data: {
+          'profileData': '{"email":"$email","fullName":"$fullName"}',
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        state = state.copyWith(
+          isLoading: false,
+          status: AuthStatus.authenticated,
+          message: 'Profile updated successfully',
+        );
+        return null; // Return null means no errors occurred
+      }
+
+      state = state.copyWith(isLoading: false, message: 'Failed to update profile.');
+      return 'Failed to update profile.';
+    } on DioException catch (e) {
+      print('Dio Exception caught: ${e.response?.data}');
+
+      // Extract backend validation messages like "email already existed"
+      final backendMessage = e.response?.data?['message'] ?? e.response?.data?['error'];
+      final errorMessage = backendMessage?.toString() ?? 'Error updating profile details.';
+
+      state = state.copyWith(isLoading: false, message: errorMessage);
+      return errorMessage;
+    } catch (e) {
+      print('Exception saving profile sequence: $e');
+      state = state.copyWith(isLoading: false, message: 'Error updating profile details.');
+      return 'Error updating profile details.';
     }
   }
 }

@@ -1,5 +1,5 @@
-import 'dart:convert'; // Required for base64 decoding
-import 'dart:ui'; // Required for ImageFilter blur effects
+import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/company/presentation/screen/companyProfile_screen.dart';
@@ -30,17 +30,12 @@ class JobDetailPopup extends ConsumerWidget {
                 topRight: Radius.circular(32),
               ),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 25,
-                  spreadRadius: 1,
-                )
+                BoxShadow(color: Colors.black12, blurRadius: 25, spreadRadius: 1),
               ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Grab Handle Indicator
                 Center(
                   child: Container(
                     width: 48,
@@ -52,7 +47,6 @@ class JobDetailPopup extends ConsumerWidget {
                     ),
                   ),
                 ),
-
                 Expanded(
                   child: detailState.when(
                     loading: () => const Center(child: CircularProgressIndicator.adaptive()),
@@ -60,9 +54,7 @@ class JobDetailPopup extends ConsumerWidget {
                       child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)),
                     ),
                     data: (data) {
-                      if (data == null) {
-                        return const Center(child: Text('No details found.'));
-                      }
+                      if (data == null) return const Center(child: Text('No details found.'));
 
                       final jobData = data is Map<String, dynamic> && data.containsKey('data')
                           ? data['data']
@@ -77,10 +69,9 @@ class JobDetailPopup extends ConsumerWidget {
                             behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                             child: ListView(
                               controller: scrollController,
-                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 120), // Added extra bottom padding so content clears the bar
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
                               physics: const ClampingScrollPhysics(),
                               children: [
-                                // Header Row: Title & Image Logo
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -121,17 +112,11 @@ class JobDetailPopup extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 20),
-
-                                // Data Grid Layout
                                 _buildQuickFactsGrid(jobData),
                                 const SizedBox(height: 24),
-
-                                // Required Skills Section
                                 if (skills.isNotEmpty) ...[
-                                  const Text(
-                                    'Required Skills',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
-                                  ),
+                                  const Text('Required Skills',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
                                   const SizedBox(height: 10),
                                   Wrap(
                                     spacing: 8,
@@ -140,27 +125,20 @@ class JobDetailPopup extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 24),
                                 ],
-
                                 const Divider(height: 1, color: Color(0xFFE2E8F0)),
                                 const SizedBox(height: 24),
-
-                                // Body Description Content
-                                const Text(
-                                  'Job Description',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
-                                ),
+                                const Text('Job Description',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
                                 const SizedBox(height: 12),
                                 _buildCleanDescription(jobData['description']?.toString() ?? ''),
                               ],
                             ),
                           ),
-
-                          // Premium Sticky Bottom Action Bar
                           Positioned(
                             bottom: 0,
                             left: 0,
                             right: 0,
-                            child: _buildStickyActionBar(context, jobData, jobId),
+                            child: _buildStickyActionBar(context, ref, jobData, jobId),
                           ),
                         ],
                       );
@@ -182,17 +160,13 @@ class JobDetailPopup extends ConsumerWidget {
       logoWidget = Container(
         width: 55,
         height: 55,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(14)),
         child: const Icon(Icons.business, color: Colors.grey),
       );
     } else {
       try {
         final base64String = logoUrl.split('base64,')[1].trim();
         final imageBytes = base64Decode(base64String);
-
         logoWidget = Container(
           width: 55,
           height: 55,
@@ -202,12 +176,9 @@ class JobDetailPopup extends ConsumerWidget {
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           padding: const EdgeInsets.all(6),
-          child: Image.memory(
-            imageBytes,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.broken_image, color: Colors.grey),
-          ),
+          child: Image.memory(imageBytes,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey)),
         );
       } catch (e) {
         logoWidget = const Icon(Icons.broken_image, color: Colors.grey);
@@ -217,10 +188,7 @@ class JobDetailPopup extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         if (companyId.isNotEmpty) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => CompanyProfileScreen(companyId: companyId)),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyProfileScreen(companyId: companyId)));
         }
       },
       child: logoWidget,
@@ -229,16 +197,8 @@ class JobDetailPopup extends ConsumerWidget {
 
   Widget _buildCleanDescription(String rawDescription) {
     if (rawDescription.isEmpty) return const Text('No description available.');
-
-    final cleanText = rawDescription
-        .replaceAll('###', '')
-        .replaceAll('**', '')
-        .replaceAll('* ', '• ');
-
-    return Text(
-      cleanText,
-      style: TextStyle(fontSize: 15, color: Colors.grey.shade800, height: 1.6),
-    );
+    final cleanText = rawDescription.replaceAll('###', '').replaceAll('**', '').replaceAll('* ', '• ');
+    return Text(cleanText, style: TextStyle(fontSize: 15, color: Colors.grey.shade800, height: 1.6));
   }
 
   Widget _buildQuickFactsGrid(Map<String, dynamic> jobData) {
@@ -251,7 +211,8 @@ class JobDetailPopup extends ConsumerWidget {
       crossAxisSpacing: 12,
       children: [
         _buildFactCard(Icons.work_outline, 'Job Type', jobData['jobType'] ?? 'N/A'),
-        _buildFactCard(Icons.location_on_outlined, 'Location', '${jobData['location'] ?? 'N/A'} (${jobData['locationType'] ?? 'N/A'})'),
+        _buildFactCard(Icons.location_on_outlined, 'Location',
+            '${jobData['location'] ?? 'N/A'} (${jobData['locationType'] ?? 'N/A'})'),
         _buildFactCard(Icons.payments_outlined, 'Salary Range', jobData['salaryRange'] ?? 'N/A'),
         _buildFactCard(Icons.stars_outlined, 'Experience', jobData['experienceRequired'] ?? 'N/A'),
       ],
@@ -281,11 +242,9 @@ class JobDetailPopup extends ConsumerWidget {
               children: [
                 Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(value,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -297,32 +256,27 @@ class JobDetailPopup extends ConsumerWidget {
   Widget _buildTechChip(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEDF2F7),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4A5568)),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFEDF2F7), borderRadius: BorderRadius.circular(8)),
+      child: Text(label.toUpperCase(),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4A5568))),
     );
   }
 
-  Widget _buildStickyActionBar(BuildContext context, Map<String, dynamic> jobData, String currentJobId) {
+  // ── Added ref parameter so we can invalidate providers after apply ──
+  Widget _buildStickyActionBar(BuildContext context, WidgetRef ref, Map<String, dynamic> jobData, String currentJobId) {
     final applicationCount = jobData['_count']?['applications'] ?? 0;
-    final String? rawStatus = jobData['appliedStatus']?.toString() ?? jobData['applicationStatus']?.toString();
-    final bool hasApplied = rawStatus != null && rawStatus != 'false' && rawStatus.trim().isNotEmpty && rawStatus != 'null';
+    final String? rawStatus =
+        jobData['appliedStatus']?.toString() ?? jobData['applicationStatus']?.toString();
+    final bool hasApplied =
+        rawStatus != null && rawStatus != 'false' && rawStatus.trim().isNotEmpty && rawStatus != 'null';
 
-    // Extract the system structural bottom padding notch barrier value dynamically
     final double systemBottomPadding = MediaQuery.of(context).padding.bottom;
-    // Apply a clean geometric base padding, increasing safely if a device notch is detected
     final double calculatedBottomPadding = systemBottomPadding > 0 ? systemBottomPadding + 10 : 24.0;
 
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
-          // Dynamic bottom padding calculation perfectly clears the native home indicator pill line
           padding: EdgeInsets.fromLTRB(24, 16, 24, calculatedBottomPadding),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.85),
@@ -330,7 +284,6 @@ class JobDetailPopup extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              // Info Section: Openings & Applications count
               Expanded(
                 flex: 2,
                 child: Column(
@@ -343,29 +296,19 @@ class JobDetailPopup extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           '${jobData['openings'] ?? 1} Openings',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2D3748),
-                          ),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF2D3748)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '$applicationCount applicants',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-
-              // Action Button Section
               Expanded(
                 flex: 3,
                 child: Container(
@@ -383,7 +326,7 @@ class JobDetailPopup extends ConsumerWidget {
                     ],
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (hasApplied) {
                         Navigator.push(
                           context,
@@ -392,12 +335,18 @@ class JobDetailPopup extends ConsumerWidget {
                           ),
                         );
                       } else {
-                        Navigator.push(
+                        // Await result — true means successfully applied
+                        final bool? didApply = await Navigator.push<bool>(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ApplyjobScreen(jobId: currentJobId),
                           ),
                         );
+
+                        // If applied successfully, close this popup too so list refreshes visibly
+                        if (didApply == true && context.mounted) {
+                          Navigator.pop(context, true); // propagate success upward
+                        }
                       }
                     },
                     style: ElevatedButton.styleFrom(

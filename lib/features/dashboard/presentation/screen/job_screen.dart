@@ -18,7 +18,6 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
   late TabController _tabController;
   Timer? _debounceTimer;
 
-  // Minimalist Premium Brand Color Palette
   static const _bg = Color(0xFFFAFAFA);
   static const _surface = Colors.white;
   static const _surfaceAlt = Color(0xFFF5F5F7);
@@ -29,8 +28,6 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
   static const _textMuted = Color(0xFF86868B);
   static const _successDim = Color(0xFFE1F5FE);
   static const _successText = Color(0xFF0288D1);
-
-  // Theme Tags for Spot Job Invitations
   static const _spotAlertDim = Color(0xFFFFF3E0);
   static const _spotAlertText = Color(0xFFE65100);
 
@@ -70,6 +67,21 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
     if (job['isApplied'] == true || job['hasApplied'] == true) return true;
     if (job['applications'] != null && (job['applications'] as List).isNotEmpty) return true;
     return false;
+  }
+
+  /// Opens the job detail bottom sheet and refreshes the list if the user applied
+  Future<void> _openJobDetail(dynamic job) async {
+    final bool? didApply = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => JobDetailPopup(jobId: job['id'].toString()),
+    );
+
+    if (didApply == true && mounted) {
+      // Refresh the job list so the card immediately shows "Applied"
+      ref.read(jobControllerProvider.notifier).fetchJobs(refresh: true);
+    }
   }
 
   @override
@@ -132,12 +144,12 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                             border: Border.all(color: _border, width: 0.5),
                           ),
                           child: Icon(
-                              Icons.tune_rounded,
-                              size: 20,
-                              color: jobState.selectedFilters.isNotEmpty ? Colors.white : _textPrimary
+                            Icons.tune_rounded,
+                            size: 20,
+                            color: jobState.selectedFilters.isNotEmpty ? Colors.white : _textPrimary,
                           ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -161,8 +173,11 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                                 ? Container(
                               margin: const EdgeInsets.only(left: 6),
                               padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(color: _spotAlertText, shape: BoxShape.circle),
-                              child: Text('${list.length}', style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                              decoration:
+                              const BoxDecoration(color: _spotAlertText, shape: BoxShape.circle),
+                              child: Text('${list.length}',
+                                  style: const TextStyle(
+                                      fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                             )
                                 : const SizedBox.shrink(),
                             loading: () => const SizedBox.shrink(),
@@ -181,13 +196,13 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
       body: TabBarView(
         controller: _tabController,
         children: [
-          // TAB ONE: Standard Positions
           Column(
             children: [
               _buildActiveFilterChips(jobState),
               Expanded(
                 child: jobState.jobListState.when(
-                  loading: () => const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
+                  loading: () =>
+                  const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
                   error: (err, _) => _buildErrorWidget(err, isSpotTab: false),
                   data: (jobs) {
                     if (jobs.isEmpty) return _buildEmptyStateWidget(isSpotTab: false);
@@ -217,7 +232,6 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
             ],
           ),
 
-          // TAB TWO: On-Demand Spot Gigs
           spotState.invitations.when(
             loading: () => const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
             error: (err, _) => _buildErrorWidget(err, isSpotTab: true),
@@ -263,10 +277,9 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
               ),
               child: Row(
                 children: [
-                  Text(
-                    '${entry.key}: ${entry.value}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary),
-                  ),
+                  Text('${entry.key}: ${entry.value}',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary)),
                   const SizedBox(width: 4),
                   GestureDetector(
                     onTap: () => ref.read(jobControllerProvider.notifier).updateFilter(entry.key, ''),
@@ -278,7 +291,8 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
           }),
           TextButton(
             onPressed: () => ref.read(jobControllerProvider.notifier).clearAllFilters(),
-            child: const Text('Clear All', style: TextStyle(fontSize: 12, color: _textSecondary, fontWeight: FontWeight.w600)),
+            child: const Text('Clear All',
+                style: TextStyle(fontSize: 12, color: _textSecondary, fontWeight: FontWeight.w600)),
           )
         ],
       ),
@@ -288,12 +302,16 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
   Widget _buildJobCard(dynamic job) {
     final applied = _isJobApplied(job);
     final title = job['title']?.toString() ?? 'Job Title';
-    final company = job['company'] != null ? job['company']['name']?.toString() ?? 'Company' : 'Company';
+    final company =
+    job['company'] != null ? job['company']['name']?.toString() ?? 'Company' : 'Company';
     final location = job['location']?.toString() ?? 'Remote';
     final jobType = job['jobType']?.toString() ?? 'Full-Time';
-    final workLocation = job['workLocationPreference']?.toString() ?? job['workLocation']?.toString() ?? 'Remote';
-    final experience = job['experience']?.toString() ?? job['experienceLevel']?.toString() ?? 'Entry Level';
-    final salary = job['expectedSalary']?.toString() ?? job['salary']?.toString() ?? 'Competitive';
+    final workLocation =
+        job['workLocationPreference']?.toString() ?? job['workLocation']?.toString() ?? 'Remote';
+    final experience =
+        job['experience']?.toString() ?? job['experienceLevel']?.toString() ?? 'Entry Level';
+    final salary =
+        job['expectedSalary']?.toString() ?? job['salary']?.toString() ?? 'Competitive';
     final category = job['category']?.toString() ?? job['industry']?.toString() ?? '';
 
     List<String> skills = [];
@@ -310,12 +328,8 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
     return Opacity(
       opacity: applied ? 0.55 : 1.0,
       child: GestureDetector(
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (context) => JobDetailPopup(jobId: job['id'].toString()),
-          );
-        },
+        // ── Changed: use _openJobDetail instead of showDialog ──
+        onTap: () => _openJobDetail(job),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -324,7 +338,6 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
             border: Border.all(color: _border, width: 0.5),
           ),
           child: Column(
-
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,9 +346,16 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.3)),
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _textPrimary,
+                                letterSpacing: -0.3)),
                         const SizedBox(height: 4),
-                        Text(company, style: const TextStyle(fontSize: 14, color: _textSecondary, fontWeight: FontWeight.w500)),
+                        Text(company,
+                            style: const TextStyle(
+                                fontSize: 14, color: _textSecondary, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ),
@@ -343,14 +363,20 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                   if (applied)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: _successDim, borderRadius: BorderRadius.circular(8)),
-                      child: const Text('Applied', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _successText)),
+                      decoration:
+                      BoxDecoration(color: _successDim, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('Applied',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700, color: _successText)),
                     )
                   else
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(8)),
-                      child: Text(salary, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textPrimary)),
+                      decoration:
+                      BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(8)),
+                      child: Text(salary,
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600, color: _textPrimary)),
                     )
                 ],
               ),
@@ -364,7 +390,8 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                   const SizedBox(width: 14),
                   const Icon(Icons.work_outline_rounded, size: 14, color: _textMuted),
                   const SizedBox(width: 4),
-                  Text('$jobType ($workLocation)', style: const TextStyle(fontSize: 13, color: _textSecondary)),
+                  Text('$jobType ($workLocation)',
+                      style: const TextStyle(fontSize: 13, color: _textSecondary)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -372,15 +399,21 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
-                    child: Text('Exp: $experience', style: const TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
+                    decoration:
+                    BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
+                    child: Text('Exp: $experience',
+                        style: const TextStyle(
+                            fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
                   ),
                   if (category.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
-                      child: Text(category, style: const TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
+                      decoration:
+                      BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
+                      child: Text(category,
+                          style: const TextStyle(
+                              fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
                     ),
                   ]
                 ],
@@ -393,15 +426,22 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: skills.take(4).map((skill) => Container(
+                  children: skills
+                      .take(4)
+                      .map((skill) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: _border, width: 0.5),
                     ),
-                    child: Text(skill, style: const TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
-                  )).toList(),
+                    child: Text(skill,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: _textSecondary,
+                            fontWeight: FontWeight.w500)),
+                  ))
+                      .toList(),
                 ),
               ],
             ],
@@ -414,9 +454,9 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
   Widget _buildSpotInvitationCard(dynamic invitation) {
     final bookingId = invitation['id']?.toString() ?? '';
     final spotJob = invitation['spotJob'] ?? {};
-
     final title = spotJob['title']?.toString() ?? 'Immediate Shift Gig';
-    final company = spotJob['company'] != null ? spotJob['company']['name']?.toString() ?? 'Hiring Agency' : 'Hiring Agency';
+    final company =
+    spotJob['company'] != null ? spotJob['company']['name']?.toString() ?? 'Hiring Agency' : 'Hiring Agency';
     final location = spotJob['location']?.toString() ?? 'On-Site Setup';
     final rate = spotJob['rate']?.toString() ?? 'Competitive';
     final rateType = spotJob['rateType']?.toString() ?? 'hr';
@@ -448,22 +488,35 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(color: _spotAlertDim, borderRadius: BorderRadius.circular(6)),
-                          child: const Text('IMMEDIATE MATCH', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _spotAlertText)),
+                          decoration:
+                          BoxDecoration(color: _spotAlertDim, borderRadius: BorderRadius.circular(6)),
+                          child: const Text('IMMEDIATE MATCH',
+                              style: TextStyle(
+                                  fontSize: 9, fontWeight: FontWeight.w800, color: _spotAlertText)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textPrimary, letterSpacing: -0.3)),
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary,
+                            letterSpacing: -0.3)),
                     const SizedBox(height: 3),
-                    Text(company, style: const TextStyle(fontSize: 14, color: _textSecondary, fontWeight: FontWeight.w500)),
+                    Text(company,
+                        style: const TextStyle(
+                            fontSize: 14, color: _textSecondary, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: _spotAlertDim, borderRadius: BorderRadius.circular(8)),
-                child: Text('$currency $rate/$rateType', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _spotAlertText)),
+                decoration:
+                BoxDecoration(color: _spotAlertDim, borderRadius: BorderRadius.circular(8)),
+                child: Text('$currency $rate/$rateType',
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: _spotAlertText)),
               )
             ],
           ),
@@ -480,11 +533,18 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: requiredSkills.map((skill) => Container(
+              children: requiredSkills
+                  .map((skill) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
-                child: Text(skill, style: const TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500)),
-              )).toList(),
+                decoration: BoxDecoration(
+                    color: _surfaceAlt, borderRadius: BorderRadius.circular(6)),
+                child: Text(skill,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: _textSecondary,
+                        fontWeight: FontWeight.w500)),
+              ))
+                  .toList(),
             ),
           ],
           Padding(
@@ -501,7 +561,9 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () => _handleSpotAction(bookingId, 'DECLINE'),
-                  child: const Text('Decline', style: TextStyle(color: _textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+                  child: const Text('Decline',
+                      style: TextStyle(
+                          color: _textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -515,7 +577,8 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                     elevation: 0,
                   ),
                   onPressed: () => _handleSpotAction(bookingId, 'ACCEPT'),
-                  child: const Text('Accept Gig', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  child: const Text('Accept Gig',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
             ],
@@ -527,18 +590,23 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
 
   void _handleSpotAction(String bookingId, String action) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    bool responseSuccess = await ref.read(spotJobProvider.notifier).respondToInvitation(bookingId, action);
+    bool responseSuccess =
+    await ref.read(spotJobProvider.notifier).respondToInvitation(bookingId, action);
 
     if (responseSuccess) {
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(action == 'ACCEPT' ? '⚡ Gig confirmed! Shift allocation successfully synced.' : 'Invitation declined safely.'),
+          content: Text(action == 'ACCEPT'
+              ? '⚡ Gig confirmed! Shift allocation successfully synced.'
+              : 'Invitation declined safely.'),
           backgroundColor: action == 'ACCEPT' ? Colors.green[800] : _accent,
         ),
       );
     } else {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Failed to update booking status. It may have expired or been filled.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+            content: Text('Failed to update booking status. It may have expired or been filled.'),
+            backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -547,7 +615,8 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
     showModalBottomSheet(
       context: context,
       backgroundColor: _surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -558,14 +627,27 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)))),
+                    Center(
+                        child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                                color: _border, borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 16),
-                    const Text('Filter Openings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textPrimary)),
+                    const Text('Filter Openings',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w700, color: _textPrimary)),
                     const SizedBox(height: 20),
                     _buildModalDropdown(
                       label: 'Job Arrangement Type',
                       currentValue: jobState.selectedFilters['jobType'] ?? '',
-                      options: {'': 'All Types', 'full-time': 'Full-Time', 'part-time': 'Part-Time', 'contract': 'Contract', 'internship': 'Internship'},
+                      options: {
+                        '': 'All Types',
+                        'full-time': 'Full-Time',
+                        'part-time': 'Part-Time',
+                        'contract': 'Contract',
+                        'internship': 'Internship'
+                      },
                       onChanged: (val) {
                         ref.read(jobControllerProvider.notifier).updateFilter('jobType', val!);
                         Navigator.pop(context);
@@ -575,9 +657,16 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                     _buildModalDropdown(
                       label: 'Work Location Setup',
                       currentValue: jobState.selectedFilters['workLocationPreference'] ?? '',
-                      options: {'': 'Any Mode', 'remote': 'Remote', 'onsite': 'On-Site', 'hybrid': 'Hybrid'},
+                      options: {
+                        '': 'Any Mode',
+                        'remote': 'Remote',
+                        'onsite': 'On-Site',
+                        'hybrid': 'Hybrid'
+                      },
                       onChanged: (val) {
-                        ref.read(jobControllerProvider.notifier).updateFilter('workLocationPreference', val!);
+                        ref
+                            .read(jobControllerProvider.notifier)
+                            .updateFilter('workLocationPreference', val!);
                         Navigator.pop(context);
                       },
                     ),
@@ -586,12 +675,18 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
                       children: [
                         Expanded(
                           child: TextButton(
-                            style: TextButton.styleFrom(backgroundColor: _surfaceAlt, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            style: TextButton.styleFrom(
+                                backgroundColor: _surfaceAlt,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12))),
                             onPressed: () {
                               ref.read(jobControllerProvider.notifier).clearAllFilters();
                               Navigator.pop(context);
                             },
-                            child: const Text('Reset All', style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w600)),
+                            child: const Text('Reset All',
+                                style: TextStyle(
+                                    color: _textPrimary, fontWeight: FontWeight.w600)),
                           ),
                         ),
                       ],
@@ -606,22 +701,34 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
     );
   }
 
-  Widget _buildModalDropdown({required String label, required String currentValue, required Map<String, String> options, required ValueChanged<String?> onChanged}) {
+  Widget _buildModalDropdown({
+    required String label,
+    required String currentValue,
+    required Map<String, String> options,
+    required ValueChanged<String?> onChanged,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary)),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: _surfaceAlt, borderRadius: BorderRadius.circular(12), border: Border.all(color: _border, width: 0.5)),
+          decoration: BoxDecoration(
+              color: _surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _border, width: 0.5)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: options.containsKey(currentValue) ? currentValue : options.keys.first,
               isExpanded: true,
               dropdownColor: _surface,
               style: const TextStyle(fontSize: 14, color: _textPrimary),
-              items: options.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+              items: options.entries
+                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
               onChanged: onChanged,
             ),
           ),
@@ -636,23 +743,30 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(isSpotTab ? Icons.bolt_outlined : Icons.search_off_rounded, size: 48, color: _textMuted),
+          Icon(isSpotTab ? Icons.bolt_outlined : Icons.search_off_rounded,
+              size: 48, color: _textMuted),
           const SizedBox(height: 16),
           Text(
-              isSpotTab ? 'No immediate spot gigs matching' : 'No jobs found matching criteria',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary)
-          ),
+              isSpotTab
+                  ? 'No immediate spot gigs matching'
+                  : 'No jobs found matching criteria',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary)),
           const SizedBox(height: 6),
           Text(
               isSpotTab
                   ? 'Ensure you toggle "Spot Available" in your settings configuration layout to capture instant invitations.'
                   : 'Try loosening your filter parameters or search vocabulary spelling words.',
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: _textSecondary)
-          ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: _textSecondary)),
           const SizedBox(height: 20),
           if (!isSpotTab)
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0),
               onPressed: () => ref.read(jobControllerProvider.notifier).clearAllFilters(),
               child: const Text('Reset Search Filters'),
             )
@@ -669,10 +783,15 @@ class _JobListScreenState extends ConsumerState<JobListScreen> with SingleTicker
         children: [
           const Icon(Icons.cloud_off_rounded, size: 44, color: _textMuted),
           const SizedBox(height: 16),
-          const Text('Failed to load listings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary)),
+          const Text('Failed to load listings',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _textPrimary)),
           const SizedBox(height: 16),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0),
             onPressed: () {
               if (isSpotTab) {
                 ref.read(spotJobProvider.notifier).fetchJobSeekerInvitations();
