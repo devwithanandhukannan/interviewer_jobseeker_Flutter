@@ -56,6 +56,7 @@ class InterviewController extends StateNotifier<InterviewState> {
 
   /// POST: /jobseeker/interviews/:id/confirm
   Future<bool> confirmInterview(String interviewId) async {
+    print(interviewId.toString());
     try {
       state = state.copyWith(isSubmitting: true);
       final dio = await _getDio();
@@ -80,6 +81,9 @@ class InterviewController extends StateNotifier<InterviewState> {
     required DateTime proposedTime,
     String? note,
   }) async {
+    print(interviewId.toString());
+    print(proposedTime.toString());
+    print(note.toString());
     try {
       state = state.copyWith(isSubmitting: true);
       final dio = await _getDio();

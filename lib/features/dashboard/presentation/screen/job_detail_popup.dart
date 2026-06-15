@@ -1,4 +1,5 @@
 import 'dart:convert'; // Required for base64 decoding
+import 'dart:ui'; // Required for ImageFilter blur effects
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/company/presentation/screen/companyProfile_screen.dart';
@@ -14,7 +15,6 @@ class JobDetailPopup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detailState = ref.watch(jobDetailDataProvider(jobId));
 
-    // Using DraggableScrollableSheet so users can drag it up/down naturally
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
       minChildSize: 0.5,
@@ -26,13 +26,13 @@ class JobDetailPopup extends ConsumerWidget {
             decoration: const BoxDecoration(
               color: Color(0xFFF8F9FA),
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(28),
-                topRight: Radius.circular(28),
+                topLeft: Radius.circular(32),
+                topRight: Radius.circular(32),
               ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black12,
-                  blurRadius: 20,
+                  blurRadius: 25,
                   spreadRadius: 1,
                 )
               ],
@@ -73,12 +73,11 @@ class JobDetailPopup extends ConsumerWidget {
 
                       return Stack(
                         children: [
-                          // ScrollConfiguration fixes standard scroll physics issues inside popups
                           ScrollConfiguration(
                             behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                             child: ListView(
-                              controller: scrollController, // Vital for linking drag gesture to sheet
-                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+                              controller: scrollController,
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 120), // Added extra bottom padding so content clears the bar
                               physics: const ClampingScrollPhysics(),
                               children: [
                                 // Header Row: Title & Image Logo
@@ -118,7 +117,7 @@ class JobDetailPopup extends ConsumerWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    _buildCompanyLogo(context ,company['logoUrl'],jobData['companyId']),
+                                    _buildCompanyLogo(context, company['logoUrl'], jobData['companyId']?.toString() ?? ''),
                                   ],
                                 ),
                                 const SizedBox(height: 20),
@@ -145,7 +144,7 @@ class JobDetailPopup extends ConsumerWidget {
                                 const Divider(height: 1, color: Color(0xFFE2E8F0)),
                                 const SizedBox(height: 24),
 
-                                // Body Markdown Description Content
+                                // Body Description Content
                                 const Text(
                                   'Job Description',
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
@@ -156,7 +155,7 @@ class JobDetailPopup extends ConsumerWidget {
                             ),
                           ),
 
-                          // Sticky Bottom Footer Call to Action (Passed context and jobId here)
+                          // Premium Sticky Bottom Action Bar
                           Positioned(
                             bottom: 0,
                             left: 0,
@@ -176,7 +175,7 @@ class JobDetailPopup extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompanyLogo(BuildContext context,String? logoUrl, String companyId) {
+  Widget _buildCompanyLogo(BuildContext context, String? logoUrl, String companyId) {
     Widget logoWidget;
 
     if (logoUrl == null || !logoUrl.contains('base64,')) {
@@ -185,7 +184,7 @@ class JobDetailPopup extends ConsumerWidget {
         height: 55,
         decoration: BoxDecoration(
           color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: const Icon(Icons.business, color: Colors.grey),
       );
@@ -199,7 +198,7 @@ class JobDetailPopup extends ConsumerWidget {
           height: 55,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           padding: const EdgeInsets.all(6),
@@ -217,10 +216,12 @@ class JobDetailPopup extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_)=> CompanyProfileScreen(companyId: companyId))
-        );
+        if (companyId.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CompanyProfileScreen(companyId: companyId)),
+          );
+        }
       },
       child: logoWidget,
     );
@@ -250,7 +251,7 @@ class JobDetailPopup extends ConsumerWidget {
       crossAxisSpacing: 12,
       children: [
         _buildFactCard(Icons.work_outline, 'Job Type', jobData['jobType'] ?? 'N/A'),
-        _buildFactCard(Icons.location_on_outlined, 'Location', '${jobData['location']} (${jobData['locationType']})'),
+        _buildFactCard(Icons.location_on_outlined, 'Location', '${jobData['location'] ?? 'N/A'} (${jobData['locationType'] ?? 'N/A'})'),
         _buildFactCard(Icons.payments_outlined, 'Salary Range', jobData['salaryRange'] ?? 'N/A'),
         _buildFactCard(Icons.stars_outlined, 'Experience', jobData['experienceRequired'] ?? 'N/A'),
       ],
@@ -262,7 +263,7 @@ class JobDetailPopup extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
@@ -309,70 +310,132 @@ class JobDetailPopup extends ConsumerWidget {
 
   Widget _buildStickyActionBar(BuildContext context, Map<String, dynamic> jobData, String currentJobId) {
     final applicationCount = jobData['_count']?['applications'] ?? 0;
-
     final String? rawStatus = jobData['appliedStatus']?.toString() ?? jobData['applicationStatus']?.toString();
     final bool hasApplied = rawStatus != null && rawStatus != 'false' && rawStatus.trim().isNotEmpty && rawStatus != 'null';
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            offset: const Offset(0, -4),
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    // Extract the system structural bottom padding notch barrier value dynamically
+    final double systemBottomPadding = MediaQuery.of(context).padding.bottom;
+    // Apply a clean geometric base padding, increasing safely if a device notch is detected
+    final double calculatedBottomPadding = systemBottomPadding > 0 ? systemBottomPadding + 10 : 24.0;
+
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          // Dynamic bottom padding calculation perfectly clears the native home indicator pill line
+          padding: EdgeInsets.fromLTRB(24, 16, 24, calculatedBottomPadding),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85),
+            border: Border(top: BorderSide(color: Colors.black.withOpacity(0.06), width: 1)),
+          ),
+          child: Row(
             children: [
-              Text(
-                '${jobData['openings'] ?? 1} Openings',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+              // Info Section: Openings & Applications count
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.eighteen_mp, size: 14, color: Color(0xFF4A5568)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${jobData['openings'] ?? 1} Openings',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2D3748),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$applicationCount applicants',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                '$applicationCount applied',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              const SizedBox(width: 16),
+
+              // Action Button Section
+              Expanded(
+                flex: 3,
+                child: Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: hasApplied
+                        ? null
+                        : [
+                      BoxShadow(
+                        color: Colors.blue.shade700.withOpacity(0.25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (hasApplied) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewapplicationstatusScreen(applicationID: rawStatus),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ApplyjobScreen(jobId: currentJobId),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: hasApplied
+                            ? LinearGradient(colors: [Colors.grey.shade200, Colors.grey.shade200])
+                            : LinearGradient(
+                          colors: [Colors.blue.shade600, Colors.blue.shade800],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: Text(
+                          hasApplied ? 'View Application' : 'Apply Now',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: hasApplied ? Colors.black87 : Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (hasApplied) {
-                  Navigator.push(context, MaterialPageRoute(builder: (context)=> ViewapplicationstatusScreen(applicationID: rawStatus)));
-                } else {
-                  // Navigates unapplied sessions out to candidate request forms
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ApplyjobScreen(jobId: currentJobId),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: hasApplied ? Colors.grey.shade200 : Colors.blue.shade700,
-                foregroundColor: hasApplied ? Colors.black87 : Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
-              ),
-              child: Text(
-                hasApplied ? 'View Application Details' : 'Apply Now',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

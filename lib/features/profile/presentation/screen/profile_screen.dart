@@ -3,8 +3,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart'; // Add this import
+import 'package:image_picker/image_picker.dart';
 import 'package:interviewer/features/profile/presentation/controller/profile_controller.dart';
+import 'package:interviewer/features/settings/presentations/screen/settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -12,7 +13,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTickerProviderStateMixin {
   int _activeTab = 0;
   bool _saving = false;
   bool _populated = false;
@@ -29,6 +30,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _industriesCtrl = TextEditingController();
   final _salaryCtrl = TextEditingController();
   final _newSkillCtrl = TextEditingController();
+
   String? _profileImage;
   String _jobType = '';
   String _expLevel = '';
@@ -41,25 +43,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   List<Map<String, dynamic>> _languages = [];
   List<Map<String, dynamic>> _achievements = [];
 
-  final ImagePicker _picker = ImagePicker(); // Add this
+  final ImagePicker _picker = ImagePicker();
 
   static const _months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   static final _years = List.generate(50, (i) => (DateTime.now().year - i).toString());
-  static const _tabIcons = [Icons.person_outline, Icons.star_outline, Icons.code_outlined, Icons.work_outline, Icons.rocket_launch_outlined, Icons.school_outlined, Icons.verified_outlined, Icons.language_outlined, Icons.emoji_events_outlined];
-  static const _tabLabels = ['Basic', 'Preferences', 'Skills', 'Experience', 'Projects', 'Education', 'Certs', 'Languages', 'Awards'];
 
-  // Apple-like Minimalist Theme - Black & White
-  static const _bg = Color(0xFFFAFAFA);
-  static const _surface = Colors.white;
-  static const _surfaceAlt = Color(0xFFF5F5F7);
-  static const _border = Color(0xFFE5E5EA);
-  static const _accent = Color(0xFF000000);
-  static const _accentSoft = Color(0xFFF5F5F7);
-  static const _textPrimary = Color(0xFF000000);
-  static const _textSecondary = Color(0xFF6E6E73);
-  static const _textMuted = Color(0xFF86868B);
-  static const _success = Color(0xFF34C759);
-  static const _danger = Color(0xFFFF3B30);
+  // ── Apple Premium Light Design Tokens ─────────────────────────────────────
+  static const _bg         = Color(0xFFF2F2F7); // Apple standard systemic background
+  static const _surface    = Color(0xFFFFFFFF); // Pure canvas white
+  static const _surfaceAlt = Color(0xFFF2F2F7);
+  static const _border     = Color(0xFFE5E5EA); // Ultra-fine crisp split line
+  static const _accent     = Color(0xFF007AFF); // Classic Apple iOS Blue
+  static const _accentLight= Color(0xFFE5F1FF);
+  static const _textPrimary   = Color(0xFF000000);
+  static const _textSecondary = Color(0xFF3A3A3C);
+  static const _textMuted     = Color(0xFF8E8E93); // iOS monochrome caption text
+  static const _success    = Color(0xFF34C759); // iOS System Green
+  static const _danger     = Color(0xFFFF3B30); // iOS System Red
+
+  static const _navItems = [
+    {'icon': Icons.person_outline_rounded,      'activeIcon': Icons.person_rounded,         'label': 'About'},
+    {'icon': Icons.tune_outlined,               'activeIcon': Icons.tune_rounded,            'label': 'Prefs'},
+    {'icon': Icons.code_outlined,               'activeIcon': Icons.code_rounded,            'label': 'Skills'},
+    {'icon': Icons.work_outline_rounded,        'activeIcon': Icons.work_rounded,            'label': 'Work'},
+    {'icon': Icons.rocket_launch_outlined,      'activeIcon': Icons.rocket_launch_rounded,   'label': 'Projects'},
+    {'icon': Icons.school_outlined,              'activeIcon': Icons.school_rounded,          'label': 'Education'},
+    {'icon': Icons.verified_outlined,           'activeIcon': Icons.verified_rounded,        'label': 'Certs'},
+    {'icon': Icons.language_outlined,           'activeIcon': Icons.language_rounded,        'label': 'Lang'},
+    {'icon': Icons.emoji_events_outlined,       'activeIcon': Icons.emoji_events_rounded,    'label': 'Awards'},
+  ];
 
   @override
   void initState() {
@@ -113,124 +125,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Map<String, dynamic> _emptyLang() => {'id': DateTime.now().millisecondsSinceEpoch, 'language': '', 'proficiency': 'Beginner'};
   Map<String, dynamic> _emptyAch() => {'id': DateTime.now().millisecondsSinceEpoch, 'title': '', 'description': '', 'year': ''};
 
-  // ✅ NEW: Image picker function
   Future<void> _pickImage() async {
-    try {
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: _surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _surface,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 36, height: 5, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(10))),
+            const Text('Profile Photo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.4)),
+            const SizedBox(height: 20),
+            _sheetOption(Icons.camera_alt_outlined, 'Take Photo', () async { Navigator.pop(ctx); await _selectImage(ImageSource.camera); }),
+            const SizedBox(height: 10),
+            _sheetOption(Icons.photo_library_outlined, 'Choose from Gallery', () async { Navigator.pop(ctx); await _selectImage(ImageSource.gallery); }),
+            if (_profileImage != null) ...[
+              const SizedBox(height: 10),
+              _sheetOption(Icons.delete_outline_rounded, 'Remove Photo', () { Navigator.pop(ctx); setState(() => _profileImage = null); _toast('Photo removed', success: true); }, danger: true),
+            ],
+          ]),
         ),
-        builder: (context) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: _border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const Text(
-                  'Choose Profile Photo',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: _textPrimary,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _imageSourceOption(
-                  icon: Icons.camera_alt_outlined,
-                  title: 'Take Photo',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _selectImage(ImageSource.camera);
-                  },
-                ),
-                const SizedBox(height: 12),
-                _imageSourceOption(
-                  icon: Icons.photo_library_outlined,
-                  title: 'Choose from Gallery',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _selectImage(ImageSource.gallery);
-                  },
-                ),
-                if (_profileImage != null) ...[
-                  const SizedBox(height: 12),
-                  _imageSourceOption(
-                    icon: Icons.delete_outline,
-                    title: 'Remove Photo',
-                    color: _danger,
-                    onTap: () {
-                      Navigator.pop(context);
-                      setState(() => _profileImage = null);
-                      _toast('Profile photo removed', success: true);
-                    },
-                  ),
-                ],
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-        ),
-      );
-    } catch (e) {
-      _toast('Failed to pick image', success: false);
-    }
+      ),
+    );
   }
 
-  Widget _imageSourceOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    return InkWell(
-      onTap: onTap,
+  Widget _sheetOption(IconData icon, String label, VoidCallback onTap, {bool danger = false}) {
+    final color = danger ? _danger : _accent;
+    final bg = danger ? _danger.withOpacity(0.08) : _accentLight;
+    return Material(
+      color: bg,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: _surfaceAlt,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _border, width: 0.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color?.withOpacity(0.1) ?? _accentSoft,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: color ?? _accent),
-            ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            Icon(icon, size: 20, color: color),
             const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: color ?? _textPrimary,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: color ?? _textMuted,
-            ),
-          ],
+            Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color, letterSpacing: -0.2)),
+          ]),
         ),
       ),
     );
@@ -238,24 +174,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _selectImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
-
+      final XFile? image = await _picker.pickImage(source: source, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
       if (image != null) {
         final bytes = await File(image.path).readAsBytes();
-        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-
-        setState(() {
-          _profileImage = base64Image;
-        });
-
+        setState(() => _profileImage = 'data:image/jpeg;base64,${base64Encode(bytes)}');
         _toast('Profile photo updated', success: true);
       }
-    } catch (e) {
+    } catch (_) {
       _toast('Failed to select image', success: false);
     }
   }
@@ -289,24 +214,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         'languages': _languages,
         'achievements': _achievements,
       };
-
       await ref.read(profileControllerProvider.notifier).UpdateUserProfile(profileData);
-
       if (mounted) {
-        _toast('Profile saved successfully!', success: true);
+        _toast('Profile saved!', success: true);
         setState(() => _populated = false);
       }
     } on DioException catch (e) {
-      String errorMessage = 'Failed to save profile';
-
-      if (e.response?.data != null) {
-        if (e.response!.data is Map) {
-          errorMessage = e.response!.data['error'] ?? e.response!.data['message'] ?? errorMessage;
-        }
-      }
-
-      if (mounted) _toast(errorMessage, success: false);
-    } catch (e) {
+      String msg = 'Failed to save profile';
+      if (e.response?.data is Map) msg = e.response!.data['error'] ?? e.response!.data['message'] ?? msg;
+      if (mounted) _toast(msg, success: false);
+    } catch (_) {
       if (mounted) _toast('Failed to save profile', success: false);
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -316,14 +233,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _toast(String msg, {required bool success}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [
-        Icon(success ? Icons.check_circle : Icons.error_outline, color: Colors.white, size: 18),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
+        Icon(success ? Icons.check_circle_rounded : Icons.error_rounded, color: Colors.white, size: 18),
+        const SizedBox(width: 12),
+        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white))),
       ]),
       backgroundColor: success ? _success : _danger,
       behavior: SnackBarBehavior.floating,
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       duration: const Duration(seconds: 3),
     ));
   }
@@ -334,16 +252,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildAppBar(),
-      body: ps.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
-        error: (e, _) => _buildError(e),
-        data: (user) {
-          if (user == null) return const Center(child: Text('No profile data.', style: TextStyle(color: _textSecondary)));
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_populated) setState(() => _populate(Map<String, dynamic>.from(user)));
-          });
-          return Column(children: [_buildTabBar(), Expanded(child: _buildTabContent())]);
-        },
+      body: Stack(
+        children: [
+          ps.when(
+            loading: () => const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
+            error: (e, _) => _buildError(e),
+            data: (user) {
+              if (user == null) return const Center(child: Text('No profile data.', style: TextStyle(color: _textMuted)));
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!_populated) setState(() => _populate(Map<String, dynamic>.from(user)));
+              });
+              return Column(children: [
+                Expanded(child: _buildTabContent()),
+                _buildBottomNav(),
+              ]);
+            },
+          ),
+          if (!_saving && ps.hasValue && ps.value != null)
+            Positioned(
+              right: 16,
+              bottom: 92,
+              child: FloatingActionButton.extended(
+                onPressed: _save,
+                backgroundColor: _accent,
+                foregroundColor: Colors.white,
+                elevation: 3,
+                icon: const Icon(Icons.save_rounded, size: 18),
+                label: const Text('Save Profile', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, letterSpacing: -0.2)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -352,31 +291,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     backgroundColor: _surface,
     elevation: 0,
     surfaceTintColor: Colors.transparent,
-    title: const Row(children: [
-      Text('Profile', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: _textPrimary, letterSpacing: -0.5)),
-    ]),
+    titleSpacing: 16,
+    title: const Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: _textPrimary, letterSpacing: -0.6)),
     actions: [
-      Padding(
-        padding: const EdgeInsets.only(right: 16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          child: TextButton(
-            onPressed: _saving ? null : _save,
-            style: TextButton.styleFrom(
-              backgroundColor: _accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: _saving
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Row(mainAxisSize: MainAxisSize.min, children: [
-              Text('Save', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.3)),
-            ]),
+      IconButton(
+        icon: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _surfaceAlt,
+            borderRadius: BorderRadius.circular(10),
           ),
+          child: const Icon(Icons.settings_outlined, size: 18, color: _textSecondary),
         ),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        tooltip: 'Settings',
       ),
+      const SizedBox(width: 12),
     ],
     bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 0.5, color: _border)),
   );
@@ -385,78 +315,86 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     child: Padding(
       padding: const EdgeInsets.all(32),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _surfaceAlt,
-              shape: BoxShape.circle,
-              border: Border.all(color: _border, width: 0.5),
-            ),
-            child: const Icon(Icons.wifi_off_rounded, size: 40, color: _textMuted)
-        ),
-        const SizedBox(height: 20),
-        const Text('Failed to load profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.5)),
-        const SizedBox(height: 8),
-        Text(e.toString().contains('DioException') ? 'Network error occurred' : e.toString(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: _textSecondary)
-        ),
+        const Icon(Icons.cloud_off_rounded, size: 44, color: _textMuted),
+        const SizedBox(height: 16),
+        const Text('Couldn\'t load profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.4)),
+        const SizedBox(height: 6),
+        const Text('Check your connection and try again.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: _textMuted)),
         const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () {
-            setState(() => _populated = false);
-            ref.read(profileControllerProvider.notifier).FetchUserProfile();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _accent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
-          ),
-          child: const Text('Retry', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        FilledButton(
+          onPressed: () { setState(() => _populated = false); ref.read(profileControllerProvider.notifier).FetchUserProfile(); },
+          style: FilledButton.styleFrom(backgroundColor: _accent, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w600)),
         ),
       ]),
     ),
   );
 
-  Widget _buildTabBar() => Container(
-    color: _surface,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: List.generate(_tabLabels.length, (i) {
-          final sel = i == _activeTab;
-          return GestureDetector(
-            onTap: () => setState(() => _activeTab = i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: sel ? _accent : _surfaceAlt,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_tabIcons[i], size: 16, color: sel ? Colors.white : _textSecondary),
-                const SizedBox(width: 6),
-                Text(_tabLabels[i], style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: sel ? Colors.white : _textSecondary,
-                  letterSpacing: -0.2,
-                )),
-              ]),
-            ),
-          );
-        }),
+  Widget _buildBottomNav() => Container(
+    decoration: const BoxDecoration(
+      color: _surface,
+      border: Border(top: BorderSide(color: _border, width: 0.5)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: SizedBox(
+          height: 48,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            itemCount: _navItems.length,
+            itemBuilder: (_, i) {
+              final sel = i == _activeTab;
+              final item = _navItems[i];
+              return GestureDetector(
+                onTap: () => setState(() => _activeTab = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: sel ? _accentLight : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        sel ? (item['activeIcon'] as IconData) : (item['icon'] as IconData),
+                        size: 19,
+                        color: sel ? _accent : _textSecondary,
+                      ),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: sel ? 6 : 0,
+                      ),
+                      if (sel)
+                        Text(
+                          item['label'] as String,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _accent,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ),
     ),
   );
 
   Widget _buildTabContent() => SingleChildScrollView(
-    padding: const EdgeInsets.all(20),
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
     child: [
       _buildBasicTab(), _buildPreferencesTab(), _buildSkillsTab(),
       _buildExperienceTab(), _buildProjectsTab(), _buildEducationTab(),
@@ -464,137 +402,118 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ][_activeTab],
   );
 
-  // ── BASIC ─────────────────────────────────────────────────────────────────
   Widget _buildBasicTab() {
     ImageProvider? img;
     if (_profileImage != null && _profileImage!.contains(',')) {
       try { img = MemoryImage(base64Decode(_profileImage!.split(',')[1].trim())); } catch (_) {}
     }
+    final initial = _fullNameCtrl.text.isNotEmpty ? _fullNameCtrl.text[0].toUpperCase() : 'U';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle('Identity', Icons.person_outline),
-      const SizedBox(height: 16),
-      _card(Row(children: [
-        GestureDetector(
-          onTap: _pickImage,
-          child: Stack(children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: _surfaceAlt,
-              backgroundImage: img,
-              child: img == null ? Text(
-                  _fullNameCtrl.text.isNotEmpty ? _fullNameCtrl.text[0].toUpperCase() : 'U',
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: _textMuted)
-              ) : null,
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                    color: _accent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _surface, width: 2)
-                ),
-                child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(width: 16),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-              _fullNameCtrl.text.isEmpty ? 'Your Name' : _fullNameCtrl.text,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.5)
-          ),
-          const SizedBox(height: 4),
-          Text(
-              _emailCtrl.text.isEmpty ? 'email@example.com' : _emailCtrl.text,
-              style: const TextStyle(fontSize: 14, color: _textSecondary)
-          ),
-        ])),
-      ])),
-      const SizedBox(height: 24),
-      _sectionTitle('Personal Details', Icons.edit_outlined),
-      const SizedBox(height: 16),
       _card(Column(children: [
-        _twoCol(_field('Full Name', _fullNameCtrl), _field('Email Address', _emailCtrl, type: TextInputType.emailAddress)),
-        _twoCol(_field('Phone Number', _phoneCtrl, type: TextInputType.phone), _field('Location', _locationCtrl)),
-        _twoCol(_field('LinkedIn URL', _linkedinCtrl), _field('GitHub URL', _githubCtrl)),
-        _field('Portfolio Website', _portfolioCtrl),
-        _field('Professional Bio', _bioCtrl, maxLines: 4, hint: 'Brief summary of your skills and experience...'),
+        Row(children: [
+          GestureDetector(
+            onTap: _pickImage,
+            child: Stack(children: [
+              Container(
+                width: 68, height: 68,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: _accentLight),
+                child: img != null
+                    ? ClipOval(child: Image(image: img, fit: BoxFit.cover))
+                    : Center(child: Text(initial, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: _accent))),
+              ),
+              Positioned(
+                bottom: 0, right: 0,
+                child: Container(
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(color: _surface, shape: BoxShape.circle, border: Border.all(color: _border, width: 0.5)),
+                  child: const Icon(Icons.camera_alt_rounded, size: 11, color: _textSecondary),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_fullNameCtrl.text.isEmpty ? 'Your Name' : _fullNameCtrl.text,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.3)),
+            const SizedBox(height: 2),
+            Text(_emailCtrl.text.isEmpty ? 'email@example.com' : _emailCtrl.text,
+                style: const TextStyle(fontSize: 13, color: _textMuted)),
+            if (_locationCtrl.text.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Row(children: [
+                const Icon(Icons.location_on_outlined, size: 13, color: _textMuted),
+                const SizedBox(width: 2),
+                Text(_locationCtrl.text, style: const TextStyle(fontSize: 12, color: _textMuted)),
+              ]),
+            ],
+          ])),
+          TextButton(
+            onPressed: _pickImage,
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), backgroundColor: _surfaceAlt, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _accent)),
+          ),
+        ]),
       ])),
+      const SizedBox(height: 20),
+      _sectionLabel('Personal Info'),
+      _card(Column(children: [
+        _twoCol(_field('Full Name', _fullNameCtrl), _field('Email', _emailCtrl, type: TextInputType.emailAddress)),
+        _twoCol(_field('Phone', _phoneCtrl, type: TextInputType.phone), _field('Location', _locationCtrl)),
+      ])),
+      const SizedBox(height: 20),
+      _sectionLabel('Online Presence'),
+      _card(Column(children: [
+        _field('LinkedIn URL', _linkedinCtrl, prefix: Icons.link_rounded),
+        _field('GitHub URL', _githubCtrl, prefix: Icons.code_rounded),
+        _field('Portfolio', _portfolioCtrl, prefix: Icons.open_in_new_rounded),
+      ])),
+      const SizedBox(height: 20),
+      _sectionLabel('Bio'),
+      _card(_field('Professional Summary', _bioCtrl, maxLines: 4, hint: 'Tell recruiters who you are and what you bring to the table…')),
     ]);
   }
 
-  // Rest of the code remains the same...
-  // (Include all other methods: _buildPreferencesTab, _buildSkillsTab, etc.)
-
   Widget _buildPreferencesTab() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _sectionTitle('Job Preferences', Icons.tune_outlined),
-    const SizedBox(height: 16),
+    _sectionLabel('Job Preferences'),
     _card(Column(children: [
-      _field('Target Roles', _rolesCtrl, hint: 'e.g. Software Engineer, Product Manager'),
-      _field('Preferred Industries', _industriesCtrl, hint: 'e.g. Technology, Healthcare'),
-      const SizedBox(height: 4),
-      _fullDropdown('Job Type', _jobType, const {'': 'Select type', 'full-time': 'Full-time', 'part-time': 'Part-time', 'contract': 'Contract', 'freelance': 'Freelance', 'internship': 'Internship'}, (v) => setState(() => _jobType = v!)),
-      const SizedBox(height: 4),
-      _fullDropdown('Experience Level', _expLevel, const {'': 'Select level', 'entry': 'Entry Level (0–2 yrs)', 'mid': 'Mid Level (2–5 yrs)', 'senior': 'Senior Level (5–10 yrs)', 'lead': 'Lead / Principal (10+ yrs)'}, (v) => setState(() => _expLevel = v!)),
-      const SizedBox(height: 4),
+      _field('Target Roles', _rolesCtrl, hint: 'Software Engineer…'),
+      _field('Preferred Industries', _industriesCtrl, hint: 'Technology, Finance…'),
+      _fullDropdown('Job Type', _jobType, const {'': 'Select type','full-time':'Full-time','part-time':'Part-time','contract':'Contract','freelance':'Freelance','internship':'Internship'}, (v) => setState(() => _jobType = v!)),
+      _fullDropdown('Experience Level', _expLevel, const {'':'Select level','entry':'Entry (0–2 yrs)','mid':'Mid (2–5 yrs)','senior':'Senior (5–10 yrs)','lead':'Lead / Principal (10+ yrs)'}, (v) => setState(() => _expLevel = v!)),
       _twoCol(
-        _field('Expected Salary', _salaryCtrl, hint: 'e.g. \$80k – \$120k'),
-        _fullDropdown('Work Mode', _workLocation, const {'': 'Select mode', 'remote': 'Remote', 'onsite': 'On-site', 'hybrid': 'Hybrid'}, (v) => setState(() => _workLocation = v!)),
+        _field('Expected Salary', _salaryCtrl, hint: '\$80k – \$120k'),
+        _fullDropdown('Work Mode', _workLocation, const {'':'Select mode','remote':'Remote','onsite':'On-site','hybrid':'Hybrid'}, (v) => setState(() => _workLocation = v!)),
       ),
     ])),
   ]);
 
   Widget _buildSkillsTab() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _sectionTitle('Skill Inventory', Icons.code_outlined),
-    const SizedBox(height: 16),
+    _sectionLabel('Skills (${_skills.length})'),
     _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: _field('Add Skill', _newSkillCtrl, hint: 'e.g. Flutter, TypeScript, Docker')),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(child: _field('Add Skill', _newSkillCtrl, hint: 'Flutter, React, Go…')),
         const SizedBox(width: 10),
         Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: ElevatedButton(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: FilledButton(
             onPressed: _addSkill,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accent,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(50, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: const Icon(Icons.add, size: 20),
+            style: FilledButton.styleFrom(backgroundColor: _accent, minimumSize: const Size(44, 44), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            child: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
           ),
         ),
       ]),
-      if (_skills.isNotEmpty) ...[
-        const SizedBox(height: 20),
-        Text('${_skills.length} skills', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8, runSpacing: 8,
-          children: _skills.asMap().entries.map((e) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _surfaceAlt,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _border, width: 0.5),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(e.value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPrimary, letterSpacing: -0.2)),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => setState(() => _skills.removeAt(e.key)),
-                child: const Icon(Icons.close, size: 16, color: _textMuted),
-              ),
-            ]),
-          )).toList(),
-        ),
-      ],
+      if (_skills.isNotEmpty) Wrap(
+        spacing: 6, runSpacing: 6,
+        children: _skills.asMap().entries.map((e) => Chip(
+          label: Text(e.value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textPrimary)),
+          deleteIcon: const Icon(Icons.close_rounded, size: 13, color: _textMuted),
+          onDeleted: () => setState(() => _skills.removeAt(e.key)),
+          backgroundColor: _surfaceAlt,
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        )).toList(),
+      ),
     ])),
   ]);
 
@@ -604,98 +523,100 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Widget _buildExperienceTab() => _dynamicSection('Experience', _experienceList, () => setState(() => _experienceList.add(_emptyExp())), (exp, i) => Column(children: [
-    _twoCol(_mapField('Company', exp, 'company'), _mapField('Job Title', exp, 'role')),
-    _mapField('Location', exp, 'location'),
-    _twoCol(_monthYear('Start Date', exp, 'startMonth', 'startYear'), _monthYear('End Date', exp, 'endMonth', 'endYear', disabled: exp['current'] == true)),
-    _checkRow('Currently working here', exp['current'] == true, (v) => setState(() => exp['current'] = v)),
-    _mapField('Description & Achievements', exp, 'description', maxLines: 4, hint: 'Key responsibilities and accomplishments...'),
-    _mapField('Technologies Used', exp, 'skills', isListField: true, hint: 'React, Node.js, AWS (comma separated)'),
-  ]), (i) => setState(() => _experienceList.removeAt(i)));
+  Widget _buildExperienceTab() => _dynamicSection('Experience', _experienceList, () => setState(() => _experienceList.add(_emptyExp())),
+          (exp, i) => Column(children: [
+        _twoCol(_mapField('Company', exp, 'company'), _mapField('Job Title', exp, 'role')),
+        _mapField('Location', exp, 'location'),
+        _twoCol(_monthYear('Start', exp, 'startMonth', 'startYear'), _monthYear('End', exp, 'endMonth', 'endYear', disabled: exp['current'] == true)),
+        _checkRow('Currently working here', exp['current'] == true, (v) => setState(() => exp['current'] = v)),
+        const SizedBox(height: 10),
+        _mapField('Description', exp, 'description', maxLines: 3, hint: 'Key responsibilities…'),
+        _mapField('Technologies', exp, 'skills', isListField: true, hint: 'React, Node.js'),
+      ]),
+          (i) => setState(() => _experienceList.removeAt(i)));
 
-  Widget _buildProjectsTab() => _dynamicSection('Project', _projects, () => setState(() => _projects.add(_emptyProj())), (proj, i) => Column(children: [
-    _mapField('Project Name', proj, 'name'),
-    _mapField('Description', proj, 'description', maxLines: 3, hint: 'What you built and why it matters...'),
-    _mapField('Technologies', proj, 'technologies', isListField: true, hint: 'Next.js, Go, Redis (comma separated)'),
-    _twoCol(_mapField('GitHub URL', proj, 'githubLink', hint: 'https://github.com/...'), _mapField('Live URL', proj, 'liveLink', hint: 'https://...')),
-  ]), (i) => setState(() => _projects.removeAt(i)));
+  Widget _buildProjectsTab() => _dynamicSection('Project', _projects, () => setState(() => _projects.add(_emptyProj())),
+          (proj, i) => Column(children: [
+        _mapField('Project Name', proj, 'name'),
+        _mapField('Description', proj, 'description', maxLines: 3, hint: 'What you built…'),
+        _mapField('Technologies', proj, 'technologies', isListField: true, hint: 'Next.js, Tailwind'),
+        _twoCol(_mapField('GitHub URL', proj, 'githubLink'), _mapField('Live URL', proj, 'liveLink')),
+      ]),
+          (i) => setState(() => _projects.removeAt(i)));
 
-  Widget _buildEducationTab() => _dynamicSection('Education', _education, () => setState(() => _education.add(_emptyEdu())), (edu, i) => Column(children: [
-    _twoCol(_mapField('Institution', edu, 'institution'), _mapField('Degree', edu, 'degree', hint: 'B.S. / M.S. / Ph.D.')),
-    _twoCol(_mapField('Field of Study', edu, 'field'), _mapField('Location', edu, 'location')),
-    _twoCol(_monthYear('Start Date', edu, 'startMonth', 'startYear'), _monthYear('End Date', edu, 'endMonth', 'endYear')),
-    _mapField('CGPA / Grade', edu, 'cgpa', hint: 'e.g. 3.8 / 4.0'),
-    _mapField('Notes', edu, 'description', maxLines: 3, hint: 'Relevant coursework, thesis, honors...'),
-  ]), (i) => setState(() => _education.removeAt(i)));
+  Widget _buildEducationTab() => _dynamicSection('Education', _education, () => setState(() => _education.add(_emptyEdu())),
+          (edu, i) => Column(children: [
+        _twoCol(_mapField('Institution', edu, 'institution'), _mapField('Degree', edu, 'degree')),
+        _twoCol(_mapField('Field of Study', edu, 'field'), _mapField('Location', edu, 'location')),
+        _twoCol(_monthYear('Start', edu, 'startMonth', 'startYear'), _monthYear('End', edu, 'endMonth', 'endYear')),
+        _mapField('GPA / Grade', edu, 'cgpa'),
+        _mapField('Notes', edu, 'description', maxLines: 2),
+      ]),
+          (i) => setState(() => _education.removeAt(i)));
 
-  Widget _buildCertificationsTab() => _dynamicSection('Certification', _certifications, () => setState(() => _certifications.add(_emptyCert())), (cert, i) => Column(children: [
-    _twoCol(_mapField('Certification Name', cert, 'name'), _mapField('Issuing Organization', cert, 'organization')),
-    _twoCol(_mapField('Issue Date (YYYY-MM)', cert, 'issueDate'), _mapField('Credential URL', cert, 'credentialUrl', hint: 'https://...')),
-  ]), (i) => setState(() => _certifications.removeAt(i)));
+  Widget _buildCertificationsTab() => _dynamicSection('Certification', _certifications, () => setState(() => _certifications.add(_emptyCert())),
+          (cert, i) => Column(children: [
+        _twoCol(_mapField('Certification Name', cert, 'name'), _mapField('Organization', cert, 'organization')),
+        _twoCol(_mapField('Issue Date', cert, 'issueDate', hint: 'YYYY-MM'), _mapField('Credential URL', cert, 'credentialUrl')),
+      ]),
+          (i) => setState(() => _certifications.removeAt(i)));
 
-  Widget _buildLanguagesTab() => _dynamicSection('Language', _languages, () => setState(() => _languages.add(_emptyLang())), (lang, i) => _twoCol(
-    _mapField('Language', lang, 'language', hint: 'e.g. English'),
-    _fullDropdown('Proficiency', lang['proficiency'] ?? 'Beginner', const {'Beginner': 'Beginner', 'Intermediate': 'Intermediate', 'Advanced': 'Advanced', 'Fluent': 'Fluent', 'Native': 'Native'}, (v) => setState(() => lang['proficiency'] = v!)),
-  ), (i) => setState(() => _languages.removeAt(i)));
+  Widget _buildLanguagesTab() => _dynamicSection('Language', _languages, () => setState(() => _languages.add(_emptyLang())),
+          (lang, i) => _twoCol(
+        _mapField('Language', lang, 'language'),
+        _fullDropdown('Proficiency', lang['proficiency'] ?? 'Beginner', const {'Beginner':'Beginner','Intermediate':'Intermediate','Advanced':'Advanced','Fluent':'Fluent','Native':'Native'}, (v) => setState(() => lang['proficiency'] = v!)),
+      ),
+          (i) => setState(() => _languages.removeAt(i)));
 
-  Widget _buildAchievementsTab() => _dynamicSection('Achievement', _achievements, () => setState(() => _achievements.add(_emptyAch())), (ach, i) => Column(children: [
-    _mapField('Title', ach, 'title', hint: 'e.g. Hackathon First Place'),
-    _mapField('Description', ach, 'description', maxLines: 3, hint: 'Context and significance...'),
-    _fullDropdown('Year', ach['year']?.toString() ?? '', {
-      '': 'Select Year', ..._years.asMap().map((_, y) => MapEntry(y, y)),
-    }, (v) => setState(() => ach['year'] = v!)),
-  ]), (i) => setState(() => _achievements.removeAt(i)));
+  Widget _buildAchievementsTab() => _dynamicSection('Achievement', _achievements, () => setState(() => _achievements.add(_emptyAch())),
+          (ach, i) => Column(children: [
+        _mapField('Title', ach, 'title'),
+        _mapField('Description', ach, 'description', maxLines: 2),
+        _fullDropdown('Year', ach['year']?.toString() ?? '', {'': 'Select Year', ..._years.asMap().map((_, y) => MapEntry(y, y))}, (v) => setState(() => ach['year'] = v!)),
+      ]),
+          (i) => setState(() => _achievements.removeAt(i)));
 
   Widget _dynamicSection(String title, List<Map<String, dynamic>> list, VoidCallback onAdd, Widget Function(Map<String, dynamic>, int) builder, void Function(int) onRemove) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Expanded(child: _sectionTitle(title, Icons.list_alt_outlined)),
+        Expanded(child: _sectionLabel('$title (${list.length})')),
         TextButton.icon(
           onPressed: onAdd,
-          icon: const Icon(Icons.add, size: 16, color: _accent),
-          label: Text('Add $title', style: const TextStyle(fontSize: 14, color: _accent, fontWeight: FontWeight.w600, letterSpacing: -0.2)),
+          icon: const Icon(Icons.add_rounded, size: 14, color: _accent),
+          label: Text('Add New', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _accent)),
           style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            backgroundColor: _surfaceAlt,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: _accentLight,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ]),
-      const SizedBox(height: 16),
+      const SizedBox(height: 10),
       ...list.asMap().entries.map((e) => Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: _surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _border, width: 0.5),
         ),
         child: Column(children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
               color: _surfaceAlt,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              border: Border(bottom: BorderSide(color: _border, width: 0.5)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(13.5)),
             ),
             child: Row(children: [
-              Text('$title ${e.key + 1}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.3)),
+              Text('$title #${e.key + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary)),
               const Spacer(),
               if (list.length > 1)
                 GestureDetector(
                   onTap: () => onRemove(e.key),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: _surfaceAlt,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _border, width: 0.5),
-                    ),
-                    child: const Icon(Icons.delete_outline, size: 18, color: _danger),
-                  ),
+                  child: const Icon(Icons.delete_outline_rounded, size: 16, color: _danger),
                 ),
             ]),
           ),
-          Padding(padding: const EdgeInsets.all(16), child: builder(e.value, e.key)),
+          Padding(padding: const EdgeInsets.all(14), child: builder(e.value, e.key)),
         ]),
       )),
     ]);
@@ -703,36 +624,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _card(Widget child) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: _surface,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       border: Border.all(color: _border, width: 0.5),
     ),
     child: child,
   );
 
-  Widget _sectionTitle(String title, IconData icon) => Row(children: [
-    Icon(icon, size: 20, color: _textPrimary),
-    const SizedBox(width: 10),
-    Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: _textPrimary, letterSpacing: -0.5)),
-  ]);
+  Widget _sectionLabel(String label) => Padding(
+    padding: const EdgeInsets.only(bottom: 8, left: 2),
+    child: Text(label.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _textMuted, letterSpacing: 0.5)),
+  );
 
   Widget _twoCol(Widget a, Widget b) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Expanded(child: a), const SizedBox(width: 12), Expanded(child: b),
   ]);
 
-  Widget _field(String label, TextEditingController ctrl, {TextInputType? type, int maxLines = 1, String? hint}) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+  Widget _field(String label, TextEditingController ctrl, {TextInputType? type, int maxLines = 1, String? hint, IconData? prefix}) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary, letterSpacing: -0.2)),
-      const SizedBox(height: 8),
+      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary)),
+      const SizedBox(height: 4),
       TextField(
         controller: ctrl,
         keyboardType: type,
         maxLines: maxLines,
-        style: const TextStyle(fontSize: 15, color: _textPrimary, letterSpacing: -0.2),
-        decoration: _dec(hint ?? label),
+        style: const TextStyle(fontSize: 14, color: _textPrimary),
+        decoration: _dec(hint ?? label, prefixIcon: prefix),
         onChanged: (_) => setState(() {}),
       ),
     ]),
@@ -741,14 +661,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _mapField(String label, Map<String, dynamic> map, String key, {int maxLines = 1, bool isListField = false, String? hint}) {
     final current = isListField ? (map[key] as List?)?.join(', ') ?? '' : map[key]?.toString() ?? '';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary, letterSpacing: -0.2)),
-        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary)),
+        const SizedBox(height: 4),
         TextFormField(
           initialValue: current,
           maxLines: maxLines,
-          style: const TextStyle(fontSize: 15, color: _textPrimary, letterSpacing: -0.2),
+          style: const TextStyle(fontSize: 14, color: _textPrimary),
           decoration: _dec(hint ?? label),
           onChanged: (v) => map[key] = isListField ? v.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList() : v,
         ),
@@ -757,15 +677,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _fullDropdown(String label, String value, Map<String, String> options, ValueChanged<String?> onChanged) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary, letterSpacing: -0.2)),
-      const SizedBox(height: 8),
+      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary)),
+      const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         value: options.containsKey(value) ? value : options.keys.first,
         isExpanded: true,
         dropdownColor: _surface,
-        style: const TextStyle(fontSize: 15, color: _textPrimary, letterSpacing: -0.2),
+        style: const TextStyle(fontSize: 14, color: _textPrimary),
         decoration: _dec(label),
         items: options.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
         onChanged: onChanged,
@@ -774,36 +694,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   );
 
   Widget _monthYear(String label, Map<String, dynamic> map, String mKey, String yKey, {bool disabled = false}) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textSecondary, letterSpacing: -0.2)),
-      const SizedBox(height: 8),
+      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _textSecondary)),
+      const SizedBox(height: 4),
       Row(children: [
         Expanded(child: IgnorePointer(
           ignoring: disabled,
           child: Opacity(
-            opacity: disabled ? 0.4 : 1,
+            opacity: disabled ? 0.3 : 1,
             child: DropdownButtonFormField<String>(
               value: _months.contains(map[mKey]) ? map[mKey] as String : null,
-              isExpanded: true,
-              dropdownColor: _surface,
-              style: const TextStyle(fontSize: 14, color: _textPrimary, letterSpacing: -0.2),
+              isExpanded: true, dropdownColor: _surface,
+              style: const TextStyle(fontSize: 13, color: _textPrimary),
               decoration: _dec('Month'),
               items: [const DropdownMenuItem(value: null, child: Text('Month', style: TextStyle(color: _textMuted))), ..._months.map((m) => DropdownMenuItem(value: m, child: Text(m, overflow: TextOverflow.ellipsis)))],
               onChanged: (v) => setState(() => map[mKey] = v ?? ''),
             ),
           ),
         )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(child: IgnorePointer(
           ignoring: disabled,
           child: Opacity(
-            opacity: disabled ? 0.4 : 1,
+            opacity: disabled ? 0.3 : 1,
             child: DropdownButtonFormField<String>(
               value: _years.contains(map[yKey]?.toString()) ? map[yKey].toString() : null,
-              isExpanded: true,
-              dropdownColor: _surface,
-              style: const TextStyle(fontSize: 14, color: _textPrimary, letterSpacing: -0.2),
+              isExpanded: true, dropdownColor: _surface,
+              style: const TextStyle(fontSize: 13, color: _textPrimary),
               decoration: _dec('Year'),
               items: [const DropdownMenuItem(value: null, child: Text('Year', style: TextStyle(color: _textMuted))), ..._years.map((y) => DropdownMenuItem(value: y, child: Text(y)))],
               onChanged: (v) => setState(() => map[yKey] = v ?? ''),
@@ -815,43 +733,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   );
 
   Widget _checkRow(String label, bool value, ValueChanged<bool> onChanged) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.only(top: 2, bottom: 6),
     child: GestureDetector(
       onTap: () => onChanged(!value),
       child: Row(children: [
         AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 22, height: 22,
+          duration: const Duration(milliseconds: 140),
+          width: 20, height: 20,
           decoration: BoxDecoration(
-              color: value ? _accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: value ? _accent : _border, width: value ? 0 : 1.5)
+            color: value ? _accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: value ? _accent : _border, width: 1),
           ),
-          child: value ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+          child: value ? const Icon(Icons.check_rounded, size: 13, color: Colors.white) : null,
         ),
         const SizedBox(width: 10),
-        Text(label, style: const TextStyle(fontSize: 14, color: _textPrimary, letterSpacing: -0.2)),
+        Text(label, style: const TextStyle(fontSize: 14, color: _textPrimary)),
       ]),
     ),
   );
 
-  InputDecoration _dec(String hint) => InputDecoration(
+  InputDecoration _dec(String hint, {IconData? prefixIcon}) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(fontSize: 14, color: _textMuted, letterSpacing: -0.2),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    hintStyle: const TextStyle(fontSize: 13, color: _textMuted),
+    prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 16, color: _textMuted) : null,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     filled: true,
     fillColor: _surfaceAlt,
-    border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _border, width: 0.5)
-    ),
-    enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _border, width: 0.5)
-    ),
-    focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _accent, width: 1.5)
-    ),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _accent, width: 1)),
   );
 }

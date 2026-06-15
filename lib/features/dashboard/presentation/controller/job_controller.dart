@@ -1,13 +1,14 @@
-import 'dart:io';
+import 'dart:io'; // Essential for handling direct File paths
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/core/dio_controller.dart';
 
 class JobState {
-  final AsyncValue<List<dynamic>> jobListState;
+  final AsyncValue<List<dynamic>> jobListState; // Stores accumulated list data
   final AsyncValue<dynamic> jobDetailState;
   final AsyncValue<dynamic> appliedJobState;
 
+  // Pagination & Filtering Metadata fields
   final int currentPage;
   final bool hasMore;
   final bool isLoadingMore;
@@ -268,3 +269,5 @@ class JobApplicationController extends StateNotifier<JobApplicationState> {
 final jobApplicationProvider = StateNotifierProvider.autoDispose<JobApplicationController, JobApplicationState>((ref) {
   return JobApplicationController(ref);
 });
+
+

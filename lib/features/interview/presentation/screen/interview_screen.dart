@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:interviewer/features/interview/presentation/controller/interview_controller.dart';
+import 'package:interviewer/features/meet/presentations/screen/meet_screen.dart';
 
 class InterviewScreen extends ConsumerStatefulWidget {
   const InterviewScreen({super.key});
@@ -287,7 +288,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
                                     padding: const EdgeInsets.symmetric(vertical: 11),
                                   ),
                                   onPressed: () {
-                                    // Deep link channel route mapping handler target
+                                    Navigator.push(context, MaterialPageRoute(builder: (_)=> InterviewRoomScreen(interviewId: id)));
                                   },
                                   child: const Text("Join", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                                 ),
