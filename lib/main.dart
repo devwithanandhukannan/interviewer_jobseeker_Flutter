@@ -1,16 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'firebase_options.dart';
+
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:interviewer/core/notification_service.dart';
+import 'package:interviewer/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:interviewer/features/auth/presentation/screen/fill_profile_screen.dart';
 import 'package:interviewer/features/auth/presentation/screen/login_screen.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:interviewer/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:interviewer/features/dashboard/presentation/screen/home_screen.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print("Processing background notification message ID: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1. Core Engine Framework Initializations
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   await Hive.openBox('userBox');
+
+  // 2. 🛑 SILENCE THE ANALYTICS WARNINGS
+  // This turns off internal event logging, stopping the "analytics library is missing" warnings.
+  await FirebaseMessaging.instance.setDeliveryMetricsExportToBigQuery(false);
+
+  // 3. Assign background messaging hooks
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(
     const ProviderScope(
@@ -26,6 +46,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: "Interviewer",
+      // Connects to your custom global snackbar key for foreground banner notifications
+      scaffoldMessengerKey: notificationScaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
@@ -36,11 +58,24 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationServiceProvider).initializeNotificationPipeline();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
 
     return switch (authState.status) {
@@ -56,7 +91,6 @@ class HomePage extends ConsumerWidget {
       AuthStatus.authenticated => const HomeScreen(),
       AuthStatus.fillInitalData => const FillProfileScreen(),
       AuthStatus.unauthenticated => const LandingPage(),
-
     };
   }
 }
@@ -79,10 +113,7 @@ class LandingPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Top Spacing Placeholder to balance center layout
                     const SizedBox(height: 20),
-
-                    // Main Branding & Info Section
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -116,8 +147,6 @@ class LandingPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 40),
-
-                        // Premium Primary Action Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -150,8 +179,6 @@ class LandingPage extends StatelessWidget {
                         ),
                       ],
                     ),
-
-                    // Footer Section with Branding Signature
                     Padding(
                       padding: const EdgeInsets.only(bottom: 24.0, top: 20.0),
                       child: Row(
