@@ -298,7 +298,7 @@ class _ViewapplicationstatusScreenState
                 final tempPath = '${cacheDir.path}/$fileName';
 
                 await dio.download(
-                  'jobseeker/resumes/$resumeId',
+                  'jobseeker/resumes/$resumeId/download',
                   tempPath,
                 );
 
